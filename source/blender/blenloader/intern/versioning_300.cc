@@ -4374,7 +4374,7 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
     }
   }
 
-  /* Goo engine version warning script - remove the old one if it exists. */
+  /* Fruitbat version warning script - remove the old one if it exists. */
   if (!MAIN_VERSION_FILE_ATLEAST(bmain, 306, 0)) {
     LISTBASE_FOREACH_MUTABLE (Text *, text, &bmain->texts) {
       if (strcmp(text->id.name, "TX.version_warning.py") > 0) {
