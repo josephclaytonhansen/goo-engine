@@ -1242,29 +1242,6 @@ bool ED_object_modifier_copy(
 
 /** \} */
 
-Vector<PointerRNA> modifier_get_edit_objects(const bContext &C, const wmOperator &op)
-{
-  Vector<PointerRNA> objects;
-  if (RNA_boolean_get(op.ptr, "use_selected_objects")) {
-    CTX_data_selected_editable_objects(&C, &objects);
-  }
-  else {
-    if (Object *object = context_active_object(&C)) {
-      objects.append(RNA_id_pointer_create(&object->id));
-    }
-  }
-  return objects;
-}
-
-void modifier_register_use_selected_objects_prop(wmOperatorType *ot)
-{
-  RNA_def_boolean(ot->srna,
-                  "use_selected_objects",
-                  false,
-                  "Selected Objects",
-                  "Affect all selected objects instead of just the active object");
-}
-
 /* ------------------------------------------------------------------- */
 /** \name Add Modifier Operator
  * \{ */
@@ -1343,7 +1320,7 @@ void OBJECT_OT_modifier_add(wmOperatorType *ot)
   ot->idname = "OBJECT_OT_modifier_add";
 
   /* api callbacks */
-  ot->invoke = modifier_add_invoke;
+  ot->invoke = WM_menu_invoke;
   ot->exec = modifier_add_exec;
   ot->poll = ED_operator_object_active_editable;
 
@@ -1355,7 +1332,6 @@ void OBJECT_OT_modifier_add(wmOperatorType *ot)
       ot->srna, "type", rna_enum_object_modifier_type_items, eModifierType_Subsurf, "Type", "");
   RNA_def_enum_funcs(prop, modifier_add_itemf);
   ot->prop = prop;
-  modifier_register_use_selected_objects_prop(ot);
 }
 
 /** \} */
@@ -1465,12 +1441,6 @@ static bool edit_modifier_invoke_properties_with_hover(bContext *C,
                                                        const wmEvent *event,
                                                        int *r_retval)
 {
-  if (RNA_struct_find_property(op->ptr, "use_selected_objects")) {
-    if (event->modifier & KM_ALT) {
-      RNA_boolean_set(op->ptr, "use_selected_objects", true);
-    }
-  }
-
   if (RNA_struct_property_is_set(op->ptr, "modifier")) {
     return true;
   }
@@ -1585,7 +1555,6 @@ void OBJECT_OT_modifier_remove(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
   edit_modifier_properties(ot);
   edit_modifier_report_property(ot);
-  modifier_register_use_selected_objects_prop(ot);
 }
 
 /** \} */
@@ -1722,7 +1691,6 @@ void OBJECT_OT_modifier_move_to_index(wmOperatorType *ot)
   edit_modifier_properties(ot);
   RNA_def_int(
       ot->srna, "index", 0, 0, INT_MAX, "Index", "The index to move the modifier to", 0, INT_MAX);
-  modifier_register_use_selected_objects_prop(ot);
 }
 
 /** \} */
@@ -1876,7 +1844,6 @@ void OBJECT_OT_modifier_apply(wmOperatorType *ot)
                                       "Make Data Single User",
                                       "Make the object's data single user if needed");
   RNA_def_property_flag(prop, (PropertyFlag)(PROP_HIDDEN | PROP_SKIP_SAVE));
-  modifier_register_use_selected_objects_prop(ot);
 }
 
 /** \} */
@@ -2077,7 +2044,6 @@ void OBJECT_OT_modifier_set_active(wmOperatorType *ot)
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
   edit_modifier_properties(ot);
-  modifier_register_use_selected_objects_prop(ot);
 }
 
 /** \} */
@@ -3758,209 +3724,3 @@ void OBJECT_OT_geometry_node_tree_copy_assign(wmOperatorType *ot)
 }
 
 /** \} */
-static int modifier_add_exec(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
-  int type = RNA_enum_get(op->ptr, "type");
-
-  bool changed = false;
-  for (const PointerRNA &ptr : modifier_get_edit_objects(*C, *op)) {
-    Object *ob = static_cast<Object *>(ptr.data);
-    if (!ED_object_modifier_add(op->reports, bmain, scene, ob, nullptr, type)) {
-      continue;
-    }
-    changed = true;
-    WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
-  }
-  if (!changed) {
-    return OPERATOR_CANCELLED;
-  }
-
-  return OPERATOR_FINISHED;
-}
-
-static int modifier_add_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-  if (event->modifier & KM_ALT) {
-    RNA_boolean_set(op->ptr, "use_selected_objects", true);
-  }
-  if (!RNA_struct_property_is_set(op->ptr, "type")) {
-    return WM_menu_invoke(C, op, event);
-  }
-  return modifier_add_exec(C, op);
-}
-ot->invoke = modifier_add_invoke;
-static int modifier_remove_exec(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-
-  char name[MAX_NAME];
-  RNA_string_get(op->ptr, "modifier", name);
-
-  bool changed = false;
-  for (const PointerRNA &ptr : modifier_get_edit_objects(*C, *op)) {
-    Object *ob = static_cast<Object *>(ptr.data);
-    ModifierData *md = BKE_modifiers_findby_name(ob, name);
-    if (md == nullptr) {
-      continue;
-    }
-
-    int mode_orig = ob->mode;
-    if (!ED_object_modifier_remove(op->reports, bmain, scene, ob, md)) {
-      continue;
-    }
-
-    changed = true;
-
-    WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
-
-    /* if cloth/softbody was removed, particle mode could be cleared */
-    if (mode_orig & OB_MODE_PARTICLE_EDIT) {
-      if ((ob->mode & OB_MODE_PARTICLE_EDIT) == 0) {
-        BKE_view_layer_synced_ensure(scene, view_layer);
-        if (ob == BKE_view_layer_active_object_get(view_layer)) {
-          WM_event_add_notifier(C, NC_SCENE | ND_MODE | NS_MODE_OBJECT, nullptr);
-        }
-      }
-    }
-  }
-
-  if (!changed) {
-    return OPERATOR_CANCELLED;
-  }
-
-  if (RNA_boolean_get(op->ptr, "report")) {
-    BKE_reportf(op->reports, RPT_INFO, "Removed modifier: %s", name);
-  }
-
-  return OPERATOR_FINISHED;
-}
-static int modifier_move_to_index_exec(bContext *C, wmOperator *op)
-{
-  char name[MAX_NAME];
-  RNA_string_get(op->ptr, "modifier", name);
-
-  const int index = RNA_int_get(op->ptr, "index");
-
-  bool changed = false;
-  for (const PointerRNA &ptr : modifier_get_edit_objects(*C, *op)) {
-    Object *ob = static_cast<Object *>(ptr.data);
-    ModifierData *md = BKE_modifiers_findby_name(ob, name);
-    if (!md) {
-      continue;
-    }
-
-    if (!ED_object_modifier_move_to_index(op->reports, RPT_WARNING, ob, md, index, true)) {
-      continue;
-    }
-    changed = true;
-  }
-
-  if (!changed) {
-    return OPERATOR_CANCELLED;
-  }
-
-  return OPERATOR_FINISHED;
-}
-static int modifier_apply_exec_ex(bContext *C, wmOperator *op, int apply_as, bool keep_modifier)
-{
-  Main *bmain = CTX_data_main(C);
-  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  Scene *scene = CTX_data_scene(C);
-  Vector<PointerRNA> objects = modifier_get_edit_objects(*C, *op);
-
-  char name[MAX_NAME];
-  RNA_string_get(op->ptr, "modifier", name);
-
-  const bool do_report = RNA_boolean_get(op->ptr, "report");
-  const int reports_len = do_report ? BLI_listbase_count(&op->reports->list) : 0;
-
-  const bool do_single_user = (apply_as == MODIFIER_APPLY_DATA) ?
-                                  RNA_boolean_get(op->ptr, "single_user") :
-                                  false;
-  const bool do_merge_customdata = (apply_as == MODIFIER_APPLY_DATA) ?
-                                       RNA_boolean_get(op->ptr, "merge_customdata") :
-                                       false;
-
-  bool changed = false;
-  for (const PointerRNA &ptr : objects) {
-    Object *ob = static_cast<Object *>(ptr.data);
-    ModifierData *md = BKE_modifiers_findby_name(ob, name);
-    if (md == nullptr) {
-      continue;
-    }
-
-    const ModifierTypeInfo *mti = BKE_modifier_get_info((ModifierType)md->type);
-
-    if (do_single_user && ID_REAL_USERS(ob->data) > 1) {
-      ED_object_single_obdata_user(bmain, scene, ob);
-      BKE_main_id_newptr_and_tag_clear(bmain);
-      WM_event_add_notifier(C, NC_WINDOW, nullptr);
-      DEG_relations_tag_update(bmain);
-    }
-
-    if (!ED_object_modifier_apply(
-            bmain, op->reports, depsgraph, scene, ob, md, apply_as, keep_modifier))
-    {
-      continue;
-    }
-    changed = true;
-
-    if (ob->type == OB_MESH && do_merge_customdata &&
-        ELEM(mti->type, ModifierTypeType::Constructive, ModifierTypeType::Nonconstructive))
-    {
-      BKE_mesh_merge_customdata_for_apply_modifier((Mesh *)ob->data);
-    }
-
-    DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
-    DEG_relations_tag_update(bmain);
-    WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
-  }
-
-  if (!changed) {
-    return OPERATOR_CANCELLED;
-  }
-
-  if (do_report) {
-    /* Only add this report if the operator didn't cause another one. The purpose here is
-     * to alert that something happened, and the previous report will do that anyway. */
-    if (BLI_listbase_count(&op->reports->list) == reports_len) {
-      BKE_reportf(op->reports, RPT_INFO, "Applied modifier: %s", name);
-    }
-  }
-
-  return OPERATOR_FINISHED;
-}
-static int modifier_copy_exec(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
-  char name[MAX_NAME];
-  RNA_string_get(op->ptr, "modifier", name);
-
-  bool changed = false;
-  for (const PointerRNA &ptr : modifier_get_edit_objects(*C, *op)) {
-    Object *ob = static_cast<Object *>(ptr.data);
-    ModifierData *md = BKE_modifiers_findby_name(ob, name);
-    if (!md) {
-      continue;
-    }
-
-    if (!ED_object_modifier_copy(op->reports, bmain, scene, ob, md)) {
-      continue;
-    }
-    changed = true;
-    DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
-    DEG_relations_tag_update(bmain);
-    WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
-  }
-
-  if (!changed) {
-    return OPERATOR_CANCELLED;
-  }
-
-  return OPERATOR_FINISHED;
-}
