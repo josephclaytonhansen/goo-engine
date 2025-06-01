@@ -582,12 +582,35 @@ static void drawviewborder(Scene *scene, Depsgraph *depsgraph, ARegion *region, 
     immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
     /* passepartout, specified in camera edit buttons */
-    if (ca && (ca->flag & CAM_SHOWPASSEPARTOUT) && ca->passepartalpha > 0.000001f &&
-        v3d->flag2 & V3D_SHOW_CAMERA_PASSEPARTOUT)
-    {
+    if (ca && (ca->flag & CAM_SHOWPASSEPARTOUT) && ca->passepartalpha > 0.000001f) {
       const float winx = (region->winx + 1);
       const float winy = (region->winy + 1);
-      // ...
+
+      float alpha = 1.0f;
+
+      if (ca->passepartalpha != 1.0f) {
+        GPU_blend(GPU_BLEND_ALPHA);
+        alpha = ca->passepartalpha;
+      }
+
+      immUniformThemeColorAlpha(TH_CAMERA_PASSEPARTOUT, alpha);
+
+      if (x1i > 0.0f) {
+        immRectf(shdr_pos, 0.0f, winy, x1i, 0.0f);
+      }
+      if (x2i < winx) {
+        immRectf(shdr_pos, x2i, winy, winx, 0.0f);
+      }
+      if (y2i < winy) {
+        immRectf(shdr_pos, x1i, winy, x2i, y2i);
+      }
+      if (y2i > 0.0f) {
+        immRectf(shdr_pos, x1i, y1i, x2i, 0.0f);
+      }
+
+      GPU_blend(GPU_BLEND_NONE);
+      immUniformThemeColor3(TH_BACK);
+      imm_draw_box_wire_2d(shdr_pos, x1i, y1i, x2i, y2i);
     }
 
 #ifdef VIEW3D_CAMERA_BORDER_HACK
@@ -599,6 +622,11 @@ static void drawviewborder(Scene *scene, Depsgraph *depsgraph, ARegion *region, 
 #endif
 
     immUnbindProgram();
+  }
+
+  /* When overlays are disabled, only show camera outline & passepartout. */
+  if (v3d->flag2 & V3D_HIDE_OVERLAYS || !(v3d->flag2 & V3D_SHOW_CAMERA_GUIDES)) {
+    return;
   }
 
   /* And now, the dashed lines! */
@@ -1120,7 +1148,7 @@ static void view3d_draw_border(const bContext *C, ARegion *region)
   RegionView3D *rv3d = static_cast<RegionView3D *>(region->regiondata);
   View3D *v3d = CTX_wm_view3d(C);
 
-  if (rv3d->persp == RV3D_CAMOB && !(v3d->flag2 & V3D_HIDE_OVERLAYS)) {
+  if (rv3d->persp == RV3D_CAMOB) {
     drawviewborder(scene, depsgraph, region, v3d);
   }
   else if (v3d->flag2 & V3D_RENDER_BORDER) {
