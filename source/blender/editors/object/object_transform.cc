@@ -1168,8 +1168,14 @@ static int object_transform_apply_invoke(bContext *C, wmOperator *op, const wmEv
       RNA_property_boolean_set(op->ptr, prop, true);
     }
     if (RNA_property_boolean_get(op->ptr, prop)) {
-      return WM_operator_confirm_message(
-          C, op, "Create new object-data users and apply transformation");
+      return WM_operator_confirm_ex(C,
+                                    op,
+                                    IFACE_("Apply Object Transformations"),
+                                    IFACE_("Warning: Multiple objects share the same data.\nMake "
+                                           "single user and then apply transformations?"),
+                                    IFACE_("Apply"),
+                                    ALERT_ICON_WARNING,
+                                    false);
     }
   }
   return object_transform_apply_exec(C, op);
