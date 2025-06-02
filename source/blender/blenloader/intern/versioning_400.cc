@@ -39,6 +39,7 @@
 #include "BLI_assert.h"
 #include "BLI_listbase.h"
 #include "BLI_map.hh"
+#include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_set.hh"
 #include "BLI_string.h"
@@ -445,6 +446,29 @@ void do_versions_after_linking_400(FileData *fd, Main *bmain)
       LISTBASE_FOREACH (Object *, object, &bmain->objects) {
         versioning_eevee_shadow_settings(object);
       }
+    }
+  }
+
+  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 402, 45)) {
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_VIEW3D) {
+            View3D *v3d = reinterpret_cast<View3D *>(sl);
+            v3d->flag2 |= V3D_SHOW_CAMERA_GUIDES;
+          }
+        }
+      }
+    }
+  }
+
+  if (MAIN_VERSION_FILE_ATLEAST(bmain, 402, 0)) {
+    /* These matrices are runtime data and in 4.2 they are not contained in DNA. For those files
+     * from future versions, initialize the matrices to the identity so they are valid before a
+     * depsgraph update. */
+    LISTBASE_FOREACH (Object *, object, &bmain->objects) {
+      unit_m4(object->object_to_world);
+      unit_m4(object->world_to_object);
     }
   }
 
