@@ -3783,7 +3783,7 @@ void OUTLINER_OT_operation(wmOperatorType *ot)
 
   ot->invoke = outliner_operation_invoke;
 
-  ot->poll = ED_operator_outliner_active;
+  ot->poll = ED_operator_region_outliner_active;
 }
 
 /** \} */

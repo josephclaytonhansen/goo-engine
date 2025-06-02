@@ -39,6 +39,7 @@
 #include "BLI_assert.h"
 #include "BLI_listbase.h"
 #include "BLI_map.hh"
+#include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_set.hh"
 #include "BLI_string.h"
@@ -458,6 +459,16 @@ void do_versions_after_linking_400(FileData *fd, Main *bmain)
           }
         }
       }
+    }
+  }
+
+  if (MAIN_VERSION_FILE_ATLEAST(bmain, 402, 0)) {
+    /* These matrices are runtime data and in 4.2 they are not contained in DNA. For those files
+     * from future versions, initialize the matrices to the identity so they are valid before a
+     * depsgraph update. */
+    LISTBASE_FOREACH (Object *, object, &bmain->objects) {
+      unit_m4(object->object_to_world);
+      unit_m4(object->world_to_object);
     }
   }
 
