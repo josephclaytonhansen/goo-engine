@@ -16,7 +16,7 @@
 #include "BLI_rand.h"
 #include "BLI_string_utils.hh"
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 #include "BKE_paint.hh"
 #include "BKE_particle.h"
 
@@ -25,13 +25,13 @@
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 
-#include "GPU_material.h"
+#include "GPU_material.hh"
 
 #include "DEG_depsgraph_query.hh"
 
 #include "../eevee_next/eevee_lut.hh"
 #include "eevee_engine.h"
-#include "eevee_private.h"
+#include "eevee_private.hh"
 
 /* *********** STATIC *********** */
 static struct {
@@ -101,8 +101,6 @@ void EEVEE_material_bind_resources(DRWShadingGroup *shgrp,
   if (use_diffuse || use_glossy || use_refract) {
     DRW_shgroup_uniform_texture_ref(shgrp, "shadowCubeTexture", &sldata->shadow_cube_pool);
     DRW_shgroup_uniform_texture_ref(shgrp, "shadowCascadeTexture", &sldata->shadow_cascade_pool);
-    DRW_shgroup_uniform_texture_ref(shgrp, "shadowCubeIDTexture", &sldata->shadow_cube_id_pool);
-    DRW_shgroup_uniform_texture_ref(shgrp, "shadowCascadeIDTexture", &sldata->shadow_cascade_id_pool);
   }
   if (use_diffuse || use_glossy || use_refract || use_ao) {
     DRW_shgroup_uniform_texture_ref(shgrp, "maxzBuffer", &vedata->txl->maxzbuffer);
@@ -248,10 +246,12 @@ void EEVEE_materials_init(EEVEE_ViewLayerData *sldata,
   }
 
   if (draw_ctx->rv3d) {
-    copy_v4_v4(sldata->common_data.camera_uv_scale, draw_ctx->rv3d->viewcamtexcofac);
+    copy_v2_v2(sldata->common_data.camera_uv_scale, &draw_ctx->rv3d->viewcamtexcofac[0]);
+    copy_v2_v2(sldata->common_data.camera_uv_bias, &draw_ctx->rv3d->viewcamtexcofac[2]);
   }
   else {
-    copy_v4_fl4(sldata->common_data.camera_uv_scale, 1.0f, 1.0f, 0.0f, 0.0f);
+    copy_v2_fl2(sldata->common_data.camera_uv_scale, 1.0f, 1.0f);
+    copy_v2_fl2(sldata->common_data.camera_uv_bias, 0.0f, 0.0f);
   }
 
   if (!DRW_state_is_image_render() && ((stl->effects->enabled_effects & EFFECT_TAA) == 0)) {
@@ -528,6 +528,8 @@ BLI_INLINE void material_shadow(EEVEE_Data *vedata,
       /* This GPUShader has already been used by another material.
        * Add new shading group just after to avoid shader switching cost. */
       grp = DRW_shgroup_create_sub(*grp_p);
+      /* Per material uniforms. */
+      DRW_shgroup_uniform_float_copy(grp, "alphaClipThreshold", alpha_clip_threshold);
     }
     else {
       *grp_p = grp = DRW_shgroup_create(sh, psl->shadow_pass);
@@ -608,6 +610,8 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
       /* This GPUShader has already been used by another material.
        * Add new shading group just after to avoid shader switching cost. */
       grp = DRW_shgroup_create_sub(*grp_p);
+      /* Per material uniforms. */
+      DRW_shgroup_uniform_float_copy(grp, "alphaClipThreshold", alpha_clip_threshold);
     }
     else {
       *grp_p = grp = DRW_shgroup_create(sh, depth_ps);
@@ -655,6 +659,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
       grp = DRW_shgroup_create_sub(*grp_p);
 
       /* Per material uniforms. */
+      DRW_shgroup_uniform_float_copy(grp, "alphaClipThreshold", alpha_clip_threshold);
       if (use_ssrefract) {
         DRW_shgroup_uniform_float_copy(grp, "refractionDepth", ma->refract_depth);
       }
@@ -758,11 +763,10 @@ static EeveeMaterialCache material_transparent(EEVEE_Data *vedata,
 /* Return correct material or empty default material if slot is empty. */
 BLI_INLINE Material *eevee_object_material_get(Object *ob, int slot, bool holdout)
 {
-  Material *ma = BKE_object_material_get_eval(ob, slot + 1);
-  bool use_custom = BKE_material_use_custom_holdout(ma);
-  if (holdout && !use_custom) {
+  if (holdout) {
     return BKE_material_default_holdout();
   }
+  Material *ma = BKE_object_material_get_eval(ob, slot + 1);
   if (ma == nullptr) {
     if (ob->type == OB_VOLUME) {
       ma = BKE_material_default_volume();
@@ -872,7 +876,7 @@ void EEVEE_materials_cache_populate(EEVEE_Data *vedata,
         GPUMaterial **gpumat_array = BLI_array_alloca(gpumat_array, materials_len);
         MATCACHE_AS_ARRAY(matcache, shading_gpumat, materials_len, gpumat_array);
         /* Get per-material split surface */
-        GPUBatch **mat_geom = DRW_cache_object_surface_material_get(
+        blender::gpu::Batch **mat_geom = DRW_cache_object_surface_material_get(
             ob, gpumat_array, materials_len);
 
         if (mat_geom) {
@@ -907,7 +911,7 @@ void EEVEE_materials_cache_populate(EEVEE_Data *vedata,
 
         if (G.debug_value == 889 && ob->sculpt && BKE_object_sculpt_pbvh_get(ob)) {
           int debug_node_nr = 0;
-          DRW_debug_modelmat(ob->object_to_world);
+          DRW_debug_modelmat(ob->object_to_world().ptr());
           BKE_pbvh_draw_debug_cb(
               BKE_object_sculpt_pbvh_get(ob), DRW_sculpt_debug_cb, &debug_node_nr);
         }

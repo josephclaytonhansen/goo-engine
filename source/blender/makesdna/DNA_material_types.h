@@ -74,7 +74,7 @@ typedef struct MaterialGPencilStyle {
   /** Radius for radial gradients. */
   float gradient_radius DNA_DEPRECATED;
   char _pad2[4];
-  /** Uv coordinates scale. */
+  /** UV coordinates scale. */
   float gradient_scale[2] DNA_DEPRECATED;
   /** Factor to shift filling in 2d space. */
   float gradient_shift[2] DNA_DEPRECATED;
@@ -220,17 +220,15 @@ typedef struct Material {
   char blend_method; /* TODO(fclem): Deprecate once we remove legacy EEVEE. */
   char blend_shadow; /* TODO(fclem): Deprecate once we remove legacy EEVEE. */
   char blend_flag;
-  char check_shadow_id;
-
-  /* Goo-engine */
-  int light_group_bits[4];
-  int light_group_shadow_bits[4];
 
   /* Volume. */
   char volume_intersection_method;
-  char _pad3[3];
+
   /* Displacement. */
   float inflate_bounds;
+
+  char _pad3[4];
+
   /**
    * Cached slots for texture painting, must be refreshed via
    * BKE_texpaint_slot_refresh_cache before using.
@@ -246,8 +244,6 @@ typedef struct Material {
 } Material;
 
 /* **************** MATERIAL ********************* */
-
-#define MA_GROUPS_ALL (int)0xFFFFFFFF
 
 /* maximum number of materials per material array.
  * (on object, mesh, light, etc.). limited by
@@ -389,8 +385,6 @@ enum {
   MA_DISPLACEMENT_DISPLACE = 1,
   MA_DISPLACEMENT_BOTH = 2,
 };
-
-#define MA_SHADOW_ID (1 << 0)
 
 /* Grease Pencil Stroke styles */
 enum {

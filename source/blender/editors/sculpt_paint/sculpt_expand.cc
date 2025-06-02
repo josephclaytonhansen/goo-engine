@@ -16,7 +16,6 @@
 #include "BLI_task.h"
 
 #include "DNA_brush_types.h"
-#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 
 #include "BKE_attribute.hh"
@@ -25,15 +24,12 @@
 #include "BKE_colortools.hh"
 #include "BKE_context.hh"
 #include "BKE_image.h"
+#include "BKE_layer.hh"
 #include "BKE_mesh.hh"
-#include "BKE_mesh_mapping.hh"
 #include "BKE_paint.hh"
 #include "BKE_pbvh_api.hh"
-#include "BKE_report.h"
-#include "BKE_scene.h"
+#include "BKE_report.hh"
 #include "BKE_subdiv_ccg.hh"
-
-#include "DEG_depsgraph.hh"
 
 #include "WM_api.hh"
 #include "WM_types.hh"
@@ -46,8 +42,8 @@
 #include "paint_intern.hh"
 #include "sculpt_intern.hh"
 
-#include "IMB_colormanagement.h"
-#include "IMB_imbuf.h"
+#include "IMB_colormanagement.hh"
+#include "IMB_imbuf.hh"
 
 #include "bmesh.hh"
 
@@ -456,7 +452,7 @@ static PBVHVertRef sculpt_expand_get_vertex_index_for_symmetry_pass(
  * Geodesic: Initializes the falloff with geodesic distances from the given active vertex, taking
  * symmetry into account.
  */
-static float *sculpt_expand_geodesic_falloff_create(Object *ob, const PBVHVertRef v)
+static Array<float> sculpt_expand_geodesic_falloff_create(Object *ob, const PBVHVertRef v)
 {
   return geodesic::distances_create_from_vert_and_symm(ob, v, FLT_MAX);
 }
@@ -468,41 +464,43 @@ static float *sculpt_expand_geodesic_falloff_create(Object *ob, const PBVHVertRe
 struct ExpandFloodFillData {
   float original_normal[3];
   float edge_sensitivity;
-  float *dists;
-  float *edge_factor;
+  MutableSpan<float> dists;
+  MutableSpan<float> edge_factor;
 };
 
-static bool expand_topology_floodfill_cb(
-    SculptSession *ss, PBVHVertRef from_v, PBVHVertRef to_v, bool is_duplicate, void *userdata)
+static bool expand_topology_floodfill_cb(SculptSession *ss,
+                                         PBVHVertRef from_v,
+                                         PBVHVertRef to_v,
+                                         bool is_duplicate,
+                                         MutableSpan<float> dists)
 {
   int from_v_i = BKE_pbvh_vertex_to_index(ss->pbvh, from_v);
   int to_v_i = BKE_pbvh_vertex_to_index(ss->pbvh, to_v);
 
-  ExpandFloodFillData *data = static_cast<ExpandFloodFillData *>(userdata);
   if (!is_duplicate) {
-    const float to_it = data->dists[from_v_i] + 1.0f;
-    data->dists[to_v_i] = to_it;
+    const float to_it = dists[from_v_i] + 1.0f;
+    dists[to_v_i] = to_it;
   }
   else {
-    data->dists[to_v_i] = data->dists[from_v_i];
+    dists[to_v_i] = dists[from_v_i];
   }
   return true;
 }
 
-static float *sculpt_expand_topology_falloff_create(Object *ob, const PBVHVertRef v)
+static Array<float> sculpt_expand_topology_falloff_create(Object *ob, const PBVHVertRef v)
 {
   SculptSession *ss = ob->sculpt;
   const int totvert = SCULPT_vertex_count_get(ss);
-  float *dists = static_cast<float *>(MEM_calloc_arrayN(totvert, sizeof(float), __func__));
+  Array<float> dists(totvert, 0.0f);
 
-  SculptFloodFill flood;
+  flood_fill::FillData flood;
   flood_fill::init_fill(ss, &flood);
   flood_fill::add_initial_with_symmetry(ob, ss, &flood, v, FLT_MAX);
 
-  ExpandFloodFillData fdata;
-  fdata.dists = dists;
-
-  flood_fill::execute(ss, &flood, expand_topology_floodfill_cb, &fdata);
+  flood_fill::execute(
+      ss, &flood, [&](SculptSession *ss, PBVHVertRef from_v, PBVHVertRef to_v, bool is_duplicate) {
+        return expand_topology_floodfill_cb(ss, from_v, to_v, is_duplicate, dists);
+      });
 
   return dists;
 }
@@ -512,13 +510,15 @@ static float *sculpt_expand_topology_falloff_create(Object *ob, const PBVHVertRe
  * each vertex and the previous one.
  * This creates falloff patterns that follow and snap to the hard edges of the object.
  */
-static bool mask_expand_normal_floodfill_cb(
-    SculptSession *ss, PBVHVertRef from_v, PBVHVertRef to_v, bool is_duplicate, void *userdata)
+static bool mask_expand_normal_floodfill_cb(SculptSession *ss,
+                                            PBVHVertRef from_v,
+                                            PBVHVertRef to_v,
+                                            bool is_duplicate,
+                                            ExpandFloodFillData *data)
 {
   int from_v_i = BKE_pbvh_vertex_to_index(ss->pbvh, from_v);
   int to_v_i = BKE_pbvh_vertex_to_index(ss->pbvh, to_v);
 
-  ExpandFloodFillData *data = static_cast<ExpandFloodFillData *>(userdata);
   if (!is_duplicate) {
     float current_normal[3], prev_normal[3];
     SCULPT_vertex_normal_get(ss, to_v, current_normal);
@@ -538,20 +538,17 @@ static bool mask_expand_normal_floodfill_cb(
   return true;
 }
 
-static float *sculpt_expand_normal_falloff_create(Object *ob,
-                                                  const PBVHVertRef v,
-                                                  const float edge_sensitivity,
-                                                  const int blur_steps)
+static Array<float> sculpt_expand_normal_falloff_create(Object *ob,
+                                                        const PBVHVertRef v,
+                                                        const float edge_sensitivity,
+                                                        const int blur_steps)
 {
   SculptSession *ss = ob->sculpt;
   const int totvert = SCULPT_vertex_count_get(ss);
-  float *dists = static_cast<float *>(MEM_calloc_arrayN(totvert, sizeof(float), __func__));
-  float *edge_factor = static_cast<float *>(MEM_callocN(sizeof(float) * totvert, __func__));
-  for (int i = 0; i < totvert; i++) {
-    edge_factor[i] = 1.0f;
-  }
+  Array<float> dists(totvert, 0.0f);
+  Array<float> edge_factor(totvert, 1.0f);
 
-  SculptFloodFill flood;
+  flood_fill::FillData flood;
   flood_fill::init_fill(ss, &flood);
   flood_fill::add_initial_with_symmetry(ob, ss, &flood, v, FLT_MAX);
 
@@ -561,7 +558,10 @@ static float *sculpt_expand_normal_falloff_create(Object *ob,
   fdata.edge_sensitivity = edge_sensitivity;
   SCULPT_vertex_normal_get(ss, v, fdata.original_normal);
 
-  flood_fill::execute(ss, &flood, mask_expand_normal_floodfill_cb, &fdata);
+  flood_fill::execute(
+      ss, &flood, [&](SculptSession *ss, PBVHVertRef from_v, PBVHVertRef to_v, bool is_duplicate) {
+        return mask_expand_normal_floodfill_cb(ss, from_v, to_v, is_duplicate, &fdata);
+      });
 
   for (int repeat = 0; repeat < blur_steps; repeat++) {
     for (int i = 0; i < totvert; i++) {
@@ -584,8 +584,6 @@ static float *sculpt_expand_normal_falloff_create(Object *ob,
     dists[i] = 1.0 - dists[i];
   }
 
-  MEM_SAFE_FREE(edge_factor);
-
   return dists;
 }
 
@@ -593,15 +591,12 @@ static float *sculpt_expand_normal_falloff_create(Object *ob,
  * Spherical: Initializes the falloff based on the distance from a vertex, taking symmetry into
  * account.
  */
-static float *sculpt_expand_spherical_falloff_create(Object *ob, const PBVHVertRef v)
+static Array<float> sculpt_expand_spherical_falloff_create(Object *ob, const PBVHVertRef v)
 {
   SculptSession *ss = ob->sculpt;
   const int totvert = SCULPT_vertex_count_get(ss);
 
-  float *dists = static_cast<float *>(MEM_malloc_arrayN(totvert, sizeof(float), __func__));
-  for (int i = 0; i < totvert; i++) {
-    dists[i] = FLT_MAX;
-  }
+  Array<float> dists(totvert, FLT_MAX);
   const char symm = SCULPT_mesh_symmetry_xyz_get(ob);
 
   for (char symm_it = 0; symm_it <= symm; symm_it++) {
@@ -628,11 +623,11 @@ static float *sculpt_expand_spherical_falloff_create(Object *ob, const PBVHVertR
  * boundary to a falloff value of 0. Then, it propagates that falloff to the rest of the mesh so it
  * stays parallel to the boundary, increasing the falloff value by 1 on each step.
  */
-static float *sculpt_expand_boundary_topology_falloff_create(Object *ob, const PBVHVertRef v)
+static Array<float> sculpt_expand_boundary_topology_falloff_create(Object *ob, const PBVHVertRef v)
 {
   SculptSession *ss = ob->sculpt;
   const int totvert = SCULPT_vertex_count_get(ss);
-  float *dists = static_cast<float *>(MEM_calloc_arrayN(totvert, sizeof(float), __func__));
+  Array<float> dists(totvert, 0.0f);
   BitVector<> visited_verts(totvert);
   std::queue<PBVHVertRef> queue;
 
@@ -690,11 +685,11 @@ static float *sculpt_expand_boundary_topology_falloff_create(Object *ob, const P
  * the base mesh faces when checking a vertex neighbor. For this reason, this is not implement
  * using the general flood-fill and sculpt neighbors accessors.
  */
-static float *sculpt_expand_diagonals_falloff_create(Object *ob, const PBVHVertRef v)
+static Array<float> sculpt_expand_diagonals_falloff_create(Object *ob, const PBVHVertRef v)
 {
   SculptSession *ss = ob->sculpt;
   const int totvert = SCULPT_vertex_count_get(ss);
-  float *dists = static_cast<float *>(MEM_calloc_arrayN(totvert, sizeof(float), __func__));
+  Array<float> dists(totvert, 0.0f);
 
   /* This algorithm uses mesh data (faces and loops), so this falloff type can't be initialized for
    * Multires. It also does not make sense to implement it for dyntopo as the result will be the
@@ -842,7 +837,7 @@ static void sculpt_expand_mesh_face_falloff_from_vertex_falloff(SculptSession *s
                                                                 Mesh *mesh,
                                                                 Cache *expand_cache)
 {
-  BLI_assert(expand_cache->vert_falloff != nullptr);
+  BLI_assert(!expand_cache->vert_falloff.is_empty());
 
   if (!expand_cache->face_falloff) {
     expand_cache->face_falloff = static_cast<float *>(
@@ -874,21 +869,19 @@ static void sculpt_expand_geodesics_from_state_boundary(Object *ob,
   SculptSession *ss = ob->sculpt;
   BLI_assert(BKE_pbvh_type(ss->pbvh) == PBVH_FACES);
 
-  GSet *initial_verts = BLI_gset_int_new("initial_verts");
+  Set<int> initial_verts;
   const BitVector<> boundary_verts = sculpt_expand_boundary_from_enabled(ss, enabled_verts, false);
   const int totvert = SCULPT_vertex_count_get(ss);
   for (int i = 0; i < totvert; i++) {
     if (!boundary_verts[i]) {
       continue;
     }
-    BLI_gset_add(initial_verts, POINTER_FROM_INT(i));
+    initial_verts.add(i);
   }
 
-  MEM_SAFE_FREE(expand_cache->vert_falloff);
   MEM_SAFE_FREE(expand_cache->face_falloff);
 
   expand_cache->vert_falloff = geodesic::distances_create(ob, initial_verts, FLT_MAX);
-  BLI_gset_free(initial_verts, nullptr);
 }
 
 /**
@@ -899,16 +892,16 @@ static void sculpt_expand_topology_from_state_boundary(Object *ob,
                                                        Cache *expand_cache,
                                                        const BitSpan enabled_verts)
 {
-  MEM_SAFE_FREE(expand_cache->vert_falloff);
   MEM_SAFE_FREE(expand_cache->face_falloff);
 
   SculptSession *ss = ob->sculpt;
   const int totvert = SCULPT_vertex_count_get(ss);
 
-  float *dists = static_cast<float *>(MEM_calloc_arrayN(totvert, sizeof(float), __func__));
+  expand_cache->vert_falloff.reinitialize(totvert);
+  expand_cache->vert_falloff.fill(0);
   const BitVector<> boundary_verts = sculpt_expand_boundary_from_enabled(ss, enabled_verts, false);
 
-  SculptFloodFill flood;
+  flood_fill::FillData flood;
   flood_fill::init_fill(ss, &flood);
   for (int i = 0; i < totvert; i++) {
     if (!boundary_verts[i]) {
@@ -919,11 +912,11 @@ static void sculpt_expand_topology_from_state_boundary(Object *ob,
     flood_fill::add_and_skip_initial(&flood, vertex);
   }
 
-  ExpandFloodFillData fdata;
-  fdata.dists = dists;
-  flood_fill::execute(ss, &flood, expand_topology_floodfill_cb, &fdata);
-
-  expand_cache->vert_falloff = dists;
+  MutableSpan<float> dists = expand_cache->vert_falloff;
+  flood_fill::execute(
+      ss, &flood, [&](SculptSession *ss, PBVHVertRef from_v, PBVHVertRef to_v, bool is_duplicate) {
+        return expand_topology_floodfill_cb(ss, from_v, to_v, is_duplicate, dists);
+      });
 }
 
 /**
@@ -1037,7 +1030,6 @@ static void sculpt_expand_initialize_from_face_set_boundary(Object *ob,
 static void sculpt_expand_falloff_factors_from_vertex_and_symm_create(
     Cache *expand_cache, Object *ob, const PBVHVertRef v, eSculptExpandFalloffType falloff_type)
 {
-  MEM_SAFE_FREE(expand_cache->vert_falloff);
   expand_cache->falloff_type = falloff_type;
 
   SculptSession *ss = ob->sculpt;
@@ -1135,7 +1127,6 @@ static void sculpt_expand_snap_initialize_from_enabled(SculptSession *ss, Cache 
  */
 static void sculpt_expand_cache_data_free(Cache *expand_cache)
 {
-  MEM_SAFE_FREE(expand_cache->vert_falloff);
   MEM_SAFE_FREE(expand_cache->face_falloff);
   MEM_SAFE_FREE(expand_cache->original_colors);
   MEM_delete<Cache>(expand_cache);
@@ -1929,7 +1920,7 @@ static int sculpt_expand_modal(bContext *C, wmOperator *op, const wmEvent *event
     sculpt_expand_move_propagation_origin(C, ob, event, expand_cache);
   }
 
-  /* Add new Face Sets IDs to the snapping gset if enabled. */
+  /* Add new Face Sets IDs to the snapping set if enabled. */
   if (expand_cache->snap) {
     const int active_face_set_id = sculpt_expand_active_face_set_id_get(ss, expand_cache);
     /* The key may exist, in that case this does nothing. */
@@ -2138,6 +2129,12 @@ static int sculpt_expand_invoke(bContext *C, wmOperator *op, const wmEvent *even
   Object *ob = CTX_data_active_object(C);
   SculptSession *ss = ob->sculpt;
   Mesh *mesh = static_cast<Mesh *>(ob->data);
+
+  const View3D *v3d = CTX_wm_view3d(C);
+  const Base *base = CTX_data_active_base(C);
+  if (!BKE_base_is_visible(v3d, base)) {
+    return OPERATOR_CANCELLED;
+  }
 
   SCULPT_stroke_id_next(ob);
 

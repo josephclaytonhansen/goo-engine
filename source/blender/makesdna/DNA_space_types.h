@@ -53,7 +53,7 @@ using AssetRepresentationHandle = blender::asset_system::AssetRepresentation;
 typedef struct AssetRepresentationHandle AssetRepresentationHandle;
 #endif
 
-/** Defined in `buttons_intern.h`. */
+/** Defined in `buttons_intern.hh`. */
 typedef struct SpaceProperties_Runtime SpaceProperties_Runtime;
 
 #ifdef __cplusplus
@@ -76,18 +76,21 @@ namespace blender::ed::text {
 struct SpaceText_Runtime;
 }  // namespace blender::ed::text
 using SpaceText_Runtime = blender::ed::text::SpaceText_Runtime;
+
+namespace blender::ed::spreadsheet {
+struct SpaceSpreadsheet_Runtime;
+}  // namespace blender::ed::spreadsheet
+using SpaceSpreadsheet_Runtime = blender::ed::spreadsheet::SpaceSpreadsheet_Runtime;
 #else
 typedef struct SpaceNode_Runtime SpaceNode_Runtime;
 typedef struct SpaceOutliner_Runtime SpaceOutliner_Runtime;
 typedef struct SpaceSeq_Runtime SpaceSeq_Runtime;
 typedef struct SpaceText_Runtime SpaceText_Runtime;
+typedef struct SpaceSpreadsheet_Runtime SpaceSpreadsheet_Runtime;
 #endif
 
 /** Defined in `file_intern.hh`. */
 typedef struct SpaceFile_Runtime SpaceFile_Runtime;
-
-/** Defined in `spreadsheet_intern.hh`. */
-typedef struct SpaceSpreadsheet_Runtime SpaceSpreadsheet_Runtime;
 
 /* -------------------------------------------------------------------- */
 /** \name SpaceLink (Base)
@@ -366,7 +369,6 @@ typedef enum eSpaceOutliner_Filter {
   SO_FILTER_ID_TYPE = (1 << 19),
 
   SO_FILTER_NO_OB_GPENCIL_LEGACY = (1 << 20),
-  SO_FILTER_NO_BONE_FLAG = (1 << 21),
 } eSpaceOutliner_Filter;
 
 #define SO_FILTER_OB_TYPE \
@@ -507,7 +509,8 @@ typedef enum eGraphEdit_Flag {
   SIPO_NOTRANSKEYCULL = (1 << 1),
   /* don't show any keyframe handles at all */
   SIPO_NOHANDLES = (1 << 2),
-  /* SIPO_NODRAWCFRANUM = (1 << 3), DEPRECATED */
+  /* Automatically lock the transform to whichever axis the cursor has moved the most. */
+  SIPO_AUTOLOCK_AXIS = (1 << 3),
   /* show timing in seconds instead of frames */
   SIPO_DRAWTIME = (1 << 4),
   /* draw names of F-Curves beside the respective curves */
@@ -697,6 +700,7 @@ typedef enum eSpaceSeq_RegionType {
   SEQ_DRAW_IMG_WAVEFORM = 2,
   SEQ_DRAW_IMG_VECTORSCOPE = 3,
   SEQ_DRAW_IMG_HISTOGRAM = 4,
+  SEQ_DRAW_IMG_RGBPARADE = 5,
 } eSpaceSeq_RegionType;
 
 /** #SpaceSeq.draw_flag */
@@ -710,7 +714,7 @@ typedef enum eSpaceSeq_DrawFlag {
 typedef enum eSpaceSeq_Flag {
   SEQ_DRAWFRAMES = (1 << 0),
   SEQ_MARKER_TRANS = (1 << 1),
-  SEQ_DRAW_COLOR_SEPARATED = (1 << 2),
+  SEQ_DRAW_COLOR_SEPARATED_UNUSED_2 = (1 << 2),
   SEQ_CLAMP_VIEW = (1 << 3),
   SPACE_SEQ_FLAG_UNUSED_4 = (1 << 4),
   SPACE_SEQ_FLAG_UNUSED_5 = (1 << 5),
@@ -1030,7 +1034,7 @@ typedef enum eFileSelectType {
 /**
  * #FileSelectParams.flag / `sfile->params->flag`.
  * \note short flag, also used as 16 lower bits of flags in link/append code
- * (WM and BLO code area, see #eBLOLibLinkFlags in BLO_readfile.h).
+ * (WM and BLO code area, see #eBLOLibLinkFlags in BLO_readfile.hh).
  */
 typedef enum eFileSel_Params_Flag {
   FILE_PARAMS_FLAG_UNUSED_1 = (1 << 0),
@@ -1264,11 +1268,13 @@ typedef struct SpaceImage {
   char gizmo_flag;
 
   char grid_shape_source;
-  char _pad1[2];
+  char _pad1[6];
 
   int flag;
 
   float uv_opacity;
+
+  float stretch_opacity;
 
   int tile_grid_shape[2];
   /**
@@ -1694,9 +1700,7 @@ typedef struct SpaceConsole {
   char _pad0[6];
   /* End 'SpaceLink' header. */
 
-  /* space vars */
-  int lheight;
-  char _pad[4];
+  /* Space variables. */
 
   /** ConsoleLine; output. */
   ListBase scrollback;
@@ -1705,6 +1709,11 @@ typedef struct SpaceConsole {
   char prompt[256];
   /** Multiple consoles are possible, not just python. */
   char language[32];
+
+  int lheight;
+
+  /** Index into history of most recent up/down arrow keys. */
+  int history_index;
 
   /** Selection offset in bytes. */
   int sel_start;
@@ -2034,6 +2043,7 @@ typedef enum eSpreadsheetColumnValueType {
   SPREADSHEET_VALUE_TYPE_INT8 = 9,
   SPREADSHEET_VALUE_TYPE_INT32_2D = 10,
   SPREADSHEET_VALUE_TYPE_QUATERNION = 11,
+  SPREADSHEET_VALUE_TYPE_FLOAT4X4 = 12,
 } eSpreadsheetColumnValueType;
 
 /**

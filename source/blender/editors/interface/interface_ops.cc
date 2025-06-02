@@ -8,6 +8,8 @@
 
 #include <cstring>
 
+#include <fmt/format.h>
+
 #include "MEM_guardedalloc.h"
 
 #include "DNA_armature_types.h"
@@ -15,50 +17,42 @@
 #include "DNA_modifier_types.h" /* for handling geometry nodes properties */
 #include "DNA_object_types.h"   /* for OB_DATA_SUPPORT_ID */
 #include "DNA_screen_types.h"
-#include "DNA_text_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math_color.h"
 
-#include "BLF_api.h"
-#include "BLT_lang.h"
-#include "BLT_translation.h"
+#include "BLF_api.hh"
+#include "BLT_lang.hh"
+#include "BLT_translation.hh"
 
 #include "BKE_context.hh"
-#include "BKE_fcurve.h"
-#include "BKE_global.h"
-#include "BKE_idprop.h"
-#include "BKE_idtype.h"
-#include "BKE_layer.h"
+#include "BKE_idtype.hh"
+#include "BKE_layer.hh"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_override.hh"
 #include "BKE_lib_remap.hh"
 #include "BKE_material.h"
 #include "BKE_node.hh"
-#include "BKE_report.h"
+#include "BKE_report.hh"
 #include "BKE_screen.hh"
-#include "BKE_text.h"
 
-#include "IMB_colormanagement.h"
+#include "IMB_colormanagement.hh"
 
 #include "DEG_depsgraph.hh"
 
 #include "RNA_access.hh"
 #include "RNA_define.hh"
-#include "RNA_enum_types.hh"
 #include "RNA_path.hh"
 #include "RNA_prototypes.h"
-#include "RNA_types.hh"
 
-#include "UI_interface.hh"
 #include "UI_abstract_view.hh"
+#include "UI_interface.hh"
 
 #include "interface_intern.hh"
 
 #include "WM_api.hh"
 #include "WM_types.hh"
 
-#include "ED_anim_api.hh"
 #include "ED_object.hh"
 #include "ED_paint.hh"
 #include "ED_undo.hh"
@@ -67,10 +61,8 @@
 #include "ED_keyframing.hh"
 
 /* only for UI_OT_editsource */
-#include "BKE_main.hh"
 #include "BLI_ghash.h"
 #include "ED_screen.hh"
-#include "ED_text.hh"
 
 using namespace blender::ui;
 
@@ -108,16 +100,13 @@ static bool copy_data_path_button_poll(bContext *C)
 {
   PointerRNA ptr;
   PropertyRNA *prop;
-  char *path;
   int index;
 
   UI_context_active_but_prop_get(C, &ptr, &prop, &index);
 
   if (ptr.owner_id && ptr.data && prop) {
-    path = RNA_path_from_ID_to_property(&ptr, prop);
-
-    if (path) {
-      MEM_freeN(path);
+    if (const std::optional<std::string> path = RNA_path_from_ID_to_property(&ptr, prop)) {
+      UNUSED_VARS(path);
       return true;
     }
   }
@@ -130,7 +119,6 @@ static int copy_data_path_button_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   PointerRNA ptr;
   PropertyRNA *prop;
-  char *path;
   int index;
   ID *id;
 
@@ -139,6 +127,7 @@ static int copy_data_path_button_exec(bContext *C, wmOperator *op)
   /* try to create driver using property retrieved from UI */
   UI_context_active_but_prop_get(C, &ptr, &prop, &index);
 
+  std::optional<std::string> path;
   if (ptr.owner_id != nullptr) {
     if (full_path) {
       if (prop) {
@@ -158,8 +147,7 @@ static int copy_data_path_button_exec(bContext *C, wmOperator *op)
     }
 
     if (path) {
-      WM_clipboard_text_set(path, false);
-      MEM_freeN(path);
+      WM_clipboard_text_set(path->c_str(), false);
       return OPERATOR_FINISHED;
     }
   }
@@ -198,7 +186,6 @@ static bool copy_as_driver_button_poll(bContext *C)
 {
   PointerRNA ptr;
   PropertyRNA *prop;
-  char *path;
   int index;
 
   UI_context_active_but_prop_get(C, &ptr, &prop, &index);
@@ -207,10 +194,8 @@ static bool copy_as_driver_button_poll(bContext *C)
       ELEM(RNA_property_type(prop), PROP_BOOLEAN, PROP_INT, PROP_FLOAT, PROP_ENUM) &&
       (index >= 0 || !RNA_property_array_check(prop)))
   {
-    path = RNA_path_from_ID_to_property(&ptr, prop);
-
-    if (path) {
-      MEM_freeN(path);
+    if (const std::optional<std::string> path = RNA_path_from_ID_to_property(&ptr, prop)) {
+      UNUSED_VARS(path);
       return true;
     }
   }
@@ -231,11 +216,10 @@ static int copy_as_driver_button_exec(bContext *C, wmOperator *op)
   if (ptr.owner_id && ptr.data && prop) {
     ID *id;
     const int dim = RNA_property_array_dimension(&ptr, prop, nullptr);
-    char *path = RNA_path_from_real_ID_to_property_index(bmain, &ptr, prop, dim, index, &id);
-
-    if (path) {
-      ANIM_copy_as_driver(id, path, RNA_property_identifier(prop));
-      MEM_freeN(path);
+    if (const std::optional<std::string> path = RNA_path_from_real_ID_to_property_index(
+            bmain, &ptr, prop, dim, index, &id))
+    {
+      ANIM_copy_as_driver(id, path->c_str(), RNA_property_identifier(prop));
       return OPERATOR_FINISHED;
     }
 
@@ -267,130 +251,6 @@ static void UI_OT_copy_as_driver_button(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Show FCurve in editor Operator
- * \{ */
-
-static bool show_fcurve_in_editor_poll(bContext *C)
-{
-  uiBut *but = UI_context_active_but_get(C);
-
-  if (but) {
-    PointerRNA *ptr = &but->rnapoin;
-    PropertyRNA *prop = but->rnaprop;
-
-    return RNA_property_animated(ptr, prop);
-  }
-
-  return false;
-}
-
-static int show_fcurve_in_editor_exec(bContext *C, wmOperator *op)
-{
-  uiBut *but = UI_context_active_but_get(C);
-
-  /* Find any open FCurve Editor for Operator context */
-  bScreen *screen = CTX_wm_screen(C);
-  ScrArea *graph_area = nullptr;
-  LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-    if (area->spacetype == SPACE_GRAPH) {
-      SpaceGraph *space = (SpaceGraph *)area->spacedata.first;
-      if (space->mode == SIPO_MODE_ANIMATION) {
-        graph_area = area;
-        break;
-      }
-    }
-  }
-
-  if (!graph_area) {
-    BKE_report(op->reports, RPT_ERROR, "No open Graph editors");
-    return OPERATOR_CANCELLED;
-  }
-
-  /* Find the correlated FCurve. */
-  bAction *action;
-  FCurve *fcu_active = BKE_fcurve_find_by_rna(
-      &but->rnapoin, but->rnaprop, but->rnaindex, nullptr, &action, nullptr, nullptr);
-
-  if (!fcu_active) {
-    BKE_report(op->reports, RPT_ERROR, "No FCurve on property");
-    return OPERATOR_CANCELLED;
-  }
-
-  { /* Context override begin */
-    ScrArea *cur_area = CTX_wm_area(C);
-    ARegion *cur_region = CTX_wm_region(C);
-    CTX_wm_area_set(C, graph_area);
-    CTX_wm_region_set(
-        C, BKE_region_find_in_listbase_by_type(&graph_area->regionbase, RGN_TYPE_WINDOW));
-
-    wmOperatorType *ot;
-    PointerRNA ptr;
-
-    /* Select all FCurves. */
-    ot = WM_operatortype_find("GRAPH_OT_select_all", true);
-    BLI_assert(ot);
-    WM_operator_properties_create_ptr(&ptr, ot);
-    RNA_enum_set(&ptr, "action", 1); /* SEL_SELECT */
-    WM_operator_name_call(C, "graph.select_all", WM_OP_EXEC_DEFAULT, &ptr, nullptr);
-    WM_operator_properties_free(&ptr);
-
-    /* Hide all fcurves. */
-    ot = WM_operatortype_find("GRAPH_OT_hide", true);
-    BLI_assert(ot);
-    WM_operator_properties_create_ptr(&ptr, ot);
-    RNA_boolean_set(&ptr, "unselected", false);
-    WM_operator_name_call(C, "graph.hide", WM_OP_EXEC_DEFAULT, &ptr, nullptr);
-    WM_operator_properties_free(&ptr);
-
-    /* Unhide FCurve of selected property path and make it Active. */
-    fcu_active->flag |= FCURVE_VISIBLE | FCURVE_ACTIVE | FCURVE_SELECTED;
-
-    /* Perform zoom-in on FCurve in all FCurve editor regions. */
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      if (area->spacetype == SPACE_GRAPH) {
-        SpaceGraph *space = (SpaceGraph *)area->spacedata.first;
-        if (space->mode == SIPO_MODE_ANIMATION) {
-          CTX_wm_area_set(C, area);
-          CTX_wm_region_set(
-              C, BKE_region_find_in_listbase_by_type(&area->regionbase, RGN_TYPE_WINDOW));
-          /* Focus view on active FCurve. */
-          ot = WM_operatortype_find("GRAPH_OT_view_all", true);
-          BLI_assert(ot);
-          WM_operator_properties_create_ptr(&ptr, ot);
-          /* Use INVOKE_DEFAULT to preserve UI animation. */
-          WM_operator_name_call(C, "graph.view_all", WM_OP_INVOKE_DEFAULT, &ptr, nullptr);
-          WM_operator_properties_free(&ptr);
-        }
-      }
-    }
-
-    CTX_wm_area_set(C, cur_area);
-    CTX_wm_region_set(C, cur_region);
-  } /* Context override end */
-
-  WM_event_add_notifier(C, NC_ANIMATION | ND_SPACE_GRAPH, nullptr);
-
-  return OPERATOR_FINISHED;
-}
-
-static void UI_OT_show_fcurve_in_editor(wmOperatorType *ot)
-{
-  /* identifiers */
-  ot->name = "Show FCurve in Editor";
-  ot->idname = "UI_OT_show_fcurve_in_editor";
-  ot->description = "Select and isolate this animation channel in Curve editors";
-
-  /* callbacks */
-  ot->exec = show_fcurve_in_editor_exec;
-  ot->poll = show_fcurve_in_editor_poll;
-
-  /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Copy Python Command Operator
  * \{ */
 
@@ -410,15 +270,12 @@ static int copy_python_command_button_exec(bContext *C, wmOperator * /*op*/)
   uiBut *but = UI_context_active_but_get(C);
 
   if (but && (but->optype != nullptr)) {
-    PointerRNA *opptr;
-    char *str;
-    opptr = UI_but_operator_ptr_get(but); /* allocated when needed, the button owns it */
+    /* allocated when needed, the button owns it */
+    PointerRNA *opptr = UI_but_operator_ptr_ensure(but);
 
-    str = WM_operator_pystring_ex(C, nullptr, false, true, but->optype, opptr);
+    std::string str = WM_operator_pystring_ex(C, nullptr, false, true, but->optype, opptr);
 
-    WM_clipboard_text_set(str, false);
-
-    MEM_freeN(str);
+    WM_clipboard_text_set(str.c_str(), false);
 
     return OPERATOR_FINISHED;
   }
@@ -963,7 +820,7 @@ static int override_idtemplate_make_exec(bContext *C, wmOperator * /*op*/)
 
   /* 'Security' extra tagging, since this process may also affect the owner ID and not only the
    * used ID, relying on the property update code only is not always enough. */
-  DEG_id_tag_update(&CTX_data_scene(C)->id, ID_RECALC_BASE_FLAGS | ID_RECALC_COPY_ON_WRITE);
+  DEG_id_tag_update(&CTX_data_scene(C)->id, ID_RECALC_BASE_FLAGS | ID_RECALC_SYNC_TO_EVAL);
   WM_event_add_notifier(C, NC_WINDOW, nullptr);
   WM_event_add_notifier(C, NC_WM | ND_LIB_OVERRIDE_CHANGED, nullptr);
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
@@ -1090,7 +947,7 @@ static int override_idtemplate_clear_exec(bContext *C, wmOperator * /*op*/)
 
   /* 'Security' extra tagging, since this process may also affect the owner ID and not only the
    * used ID, relying on the property update code only is not always enough. */
-  DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS | ID_RECALC_COPY_ON_WRITE);
+  DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS | ID_RECALC_SYNC_TO_EVAL);
   WM_event_add_notifier(C, NC_WINDOW, nullptr);
   WM_event_add_notifier(C, NC_WM | ND_LIB_OVERRIDE_CHANGED, nullptr);
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, nullptr);
@@ -1160,59 +1017,52 @@ static void override_idtemplate_menu()
 #define NOT_NULL(assignment) ((assignment) != nullptr)
 #define NOT_RNA_NULL(assignment) ((assignment).data != nullptr)
 
-static void ui_context_selected_bones_via_pose(bContext *C, ListBase *r_lb)
+static void ui_context_selected_bones_via_pose(bContext *C, blender::Vector<PointerRNA> *r_lb)
 {
-  ListBase lb;
-  lb = CTX_data_collection_get(C, "selected_pose_bones");
+  blender::Vector<PointerRNA> lb = CTX_data_collection_get(C, "selected_pose_bones");
 
-  if (!BLI_listbase_is_empty(&lb)) {
-    LISTBASE_FOREACH (CollectionPointerLink *, link, &lb) {
-      bPoseChannel *pchan = static_cast<bPoseChannel *>(link->ptr.data);
-      link->ptr = RNA_pointer_create(link->ptr.owner_id, &RNA_Bone, pchan->bone);
+  if (!lb.is_empty()) {
+    for (PointerRNA &ptr : lb) {
+      bPoseChannel *pchan = static_cast<bPoseChannel *>(ptr.data);
+      ptr = RNA_pointer_create(ptr.owner_id, &RNA_Bone, pchan->bone);
     }
   }
 
-  *r_lb = lb;
+  *r_lb = std::move(lb);
 }
 
-static void ui_context_fcurve_modifiers_via_fcurve(bContext *C, ListBase *r_lb, FModifier *source)
+static void ui_context_fcurve_modifiers_via_fcurve(bContext *C,
+                                                   blender::Vector<PointerRNA> *r_lb,
+                                                   FModifier *source)
 {
-  ListBase /* CollectionPointerLink */ fcurve_links;
+  blender::Vector<PointerRNA> fcurve_links;
   fcurve_links = CTX_data_collection_get(C, "selected_editable_fcurves");
-  if (BLI_listbase_is_empty(&fcurve_links)) {
+  if (fcurve_links.is_empty()) {
     return;
   }
-  LISTBASE_FOREACH_MUTABLE (CollectionPointerLink *, link, &fcurve_links) {
-    FCurve *fcu = static_cast<FCurve *>(link->ptr.data);
-    bool found_modifier = false;
+  r_lb->clear();
+  for (const PointerRNA &ptr : fcurve_links) {
+    FCurve *fcu = static_cast<FCurve *>(ptr.data);
     LISTBASE_FOREACH (FModifier *, mod, &fcu->modifiers) {
       if (STREQ(mod->name, source->name) && mod->type == source->type) {
-        link->ptr = RNA_pointer_create(link->ptr.owner_id, &RNA_FModifier, mod);
-        found_modifier = true;
+        r_lb->append(RNA_pointer_create(ptr.owner_id, &RNA_FModifier, mod));
         /* Since names are unique it is safe to break here. */
         break;
       }
     }
-    if (!found_modifier) {
-      /* FCurves that don't have a modifier named the same must be removed to avoid segfaults. */
-      BLI_freelinkN(&fcurve_links, link);
-    }
   }
-
-  *r_lb = fcurve_links;
 }
 
 bool UI_context_copy_to_selected_list(bContext *C,
                                       PointerRNA *ptr,
                                       PropertyRNA *prop,
-                                      ListBase *r_lb,
+                                      blender::Vector<PointerRNA> *r_lb,
                                       bool *r_use_path_from_id,
-                                      char **r_path)
+                                      std::optional<std::string> *r_path)
 {
   *r_use_path_from_id = false;
-  *r_path = nullptr;
+  *r_path = std::nullopt;
   /* special case for bone constraints */
-  char *path_from_bone = nullptr;
   const bool is_rna = !RNA_property_is_idprop(prop);
   /* Remove links from the collection list which don't contain 'prop'. */
   bool ensure_list_items_contain_prop = false;
@@ -1227,34 +1077,34 @@ bool UI_context_copy_to_selected_list(bContext *C,
    */
   if (is_rna && RNA_struct_is_a(ptr->type, &RNA_PropertyGroup)) {
     PointerRNA owner_ptr;
-    char *idpath = nullptr;
+    std::optional<std::string> idpath;
 
     /* First, check the active PoseBone and PoseBone->Bone. */
     if (NOT_RNA_NULL(owner_ptr = CTX_data_pointer_get_type(C, "active_pose_bone", &RNA_PoseBone)))
     {
-      if (NOT_NULL(idpath = RNA_path_from_struct_to_idproperty(
-                       &owner_ptr, static_cast<const IDProperty *>(ptr->data))))
-      {
+      idpath = RNA_path_from_struct_to_idproperty(&owner_ptr,
+                                                  static_cast<const IDProperty *>(ptr->data));
+      if (idpath) {
         *r_lb = CTX_data_collection_get(C, "selected_pose_bones");
       }
       else {
         bPoseChannel *pchan = static_cast<bPoseChannel *>(owner_ptr.data);
         owner_ptr = RNA_pointer_create(owner_ptr.owner_id, &RNA_Bone, pchan->bone);
-
-        if (NOT_NULL(idpath = RNA_path_from_struct_to_idproperty(
-                         &owner_ptr, static_cast<const IDProperty *>(ptr->data))))
-        {
+        idpath = RNA_path_from_struct_to_idproperty(&owner_ptr,
+                                                    static_cast<const IDProperty *>(ptr->data));
+        if (idpath) {
           ui_context_selected_bones_via_pose(C, r_lb);
         }
       }
     }
 
-    if (idpath == nullptr) {
+    if (!idpath) {
       /* Check the active EditBone if in edit mode. */
+      idpath = RNA_path_from_struct_to_idproperty(&owner_ptr,
+                                                  static_cast<const IDProperty *>(ptr->data));
       if (NOT_RNA_NULL(
               owner_ptr = CTX_data_pointer_get_type_silent(C, "active_bone", &RNA_EditBone)) &&
-          NOT_NULL(idpath = RNA_path_from_struct_to_idproperty(
-                       &owner_ptr, static_cast<const IDProperty *>(ptr->data))))
+          idpath)
       {
         *r_lb = CTX_data_collection_get(C, "selected_editable_bones");
       }
@@ -1263,8 +1113,7 @@ bool UI_context_copy_to_selected_list(bContext *C,
     }
 
     if (idpath) {
-      *r_path = BLI_sprintfN("%s.%s", idpath, RNA_property_identifier(prop));
-      MEM_freeN(idpath);
+      *r_path = fmt::format("{}.{}", *idpath, RNA_property_identifier(prop));
       return true;
     }
   }
@@ -1280,7 +1129,8 @@ bool UI_context_copy_to_selected_list(bContext *C,
   }
   else if (RNA_struct_is_a(ptr->type, &RNA_BoneColor)) {
     /* Get the things that own the bone color (bones, pose bones, or edit bones). */
-    ListBase list_of_things = {}; /* First this will be bones, then gets remapped to colors. */
+    /* First this will be bones, then gets remapped to colors. */
+    blender::Vector<PointerRNA> list_of_things = {};
     switch (GS(ptr->owner_id->name)) {
       case ID_OB:
         list_of_things = CTX_data_collection_get(C, "selected_pose_bones");
@@ -1304,7 +1154,9 @@ bool UI_context_copy_to_selected_list(bContext *C,
         printf("BoneColor is unexpectedly owned by %s '%s'\n",
                BKE_idtype_idcode_to_name(GS(ptr->owner_id->name)),
                ptr->owner_id->name + 2);
-        BLI_assert(!"expected BoneColor to be owned by the Armature (bone & edit bone) or the Object (pose bone)");
+        BLI_assert_msg(false,
+                       "expected BoneColor to be owned by the Armature "
+                       "(bone & edit bone) or the Object (pose bone)");
         return false;
     }
 
@@ -1351,16 +1203,16 @@ bool UI_context_copy_to_selected_list(bContext *C,
   else if (RNA_struct_is_a(ptr->type, &RNA_MovieTrackingTrack)) {
     *r_lb = CTX_data_collection_get(C, "selected_movieclip_tracks");
   }
-  else if (RNA_struct_is_a(ptr->type, &RNA_Constraint) &&
-           (path_from_bone = RNA_path_resolve_from_type_to_property(ptr, prop, &RNA_PoseBone)) !=
-               nullptr)
+  else if (const std::optional<std::string> path_from_bone =
+               RNA_path_resolve_from_type_to_property(ptr, prop, &RNA_PoseBone);
+           RNA_struct_is_a(ptr->type, &RNA_Constraint) && path_from_bone)
   {
     *r_lb = CTX_data_collection_get(C, "selected_pose_bones");
     *r_path = path_from_bone;
   }
   else if (RNA_struct_is_a(ptr->type, &RNA_Node) || RNA_struct_is_a(ptr->type, &RNA_NodeSocket)) {
-    ListBase lb = {nullptr, nullptr};
-    char *path = nullptr;
+    blender::Vector<PointerRNA> lb;
+    std::optional<std::string> path;
     bNode *node = nullptr;
 
     /* Get the node we're editing */
@@ -1368,7 +1220,8 @@ bool UI_context_copy_to_selected_list(bContext *C,
       bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
       bNodeSocket *sock = static_cast<bNodeSocket *>(ptr->data);
       if (nodeFindNodeTry(ntree, sock, &node, nullptr)) {
-        if ((path = RNA_path_resolve_from_type_to_property(ptr, prop, &RNA_Node)) != nullptr) {
+        path = RNA_path_resolve_from_type_to_property(ptr, prop, &RNA_Node);
+        if (path) {
           /* we're good! */
         }
         else {
@@ -1383,15 +1236,13 @@ bool UI_context_copy_to_selected_list(bContext *C,
     /* Now filter by type */
     if (node) {
       lb = CTX_data_collection_get(C, "selected_nodes");
-
-      LISTBASE_FOREACH_MUTABLE (CollectionPointerLink *, link, &lb) {
-        bNode *node_data = static_cast<bNode *>(link->ptr.data);
-
+      lb.remove_if([&](const PointerRNA &link) {
+        bNode *node_data = static_cast<bNode *>(link.data);
         if (node_data->type != node->type) {
-          BLI_remlink(&lb, link);
-          MEM_freeN(link);
+          return true;
         }
-      }
+        return false;
+      });
     }
 
     *r_lb = lb;
@@ -1408,38 +1259,36 @@ bool UI_context_copy_to_selected_list(bContext *C,
     else if (OB_DATA_SUPPORT_ID(GS(id->name))) {
       /* check we're using the active object */
       const short id_code = GS(id->name);
-      ListBase lb = CTX_data_collection_get(C, "selected_editable_objects");
-      char *path = RNA_path_from_ID_to_property(ptr, prop);
+      blender::Vector<PointerRNA> lb = CTX_data_collection_get(C, "selected_editable_objects");
+      const std::optional<std::string> path = RNA_path_from_ID_to_property(ptr, prop);
 
       /* de-duplicate obdata */
-      if (!BLI_listbase_is_empty(&lb)) {
-        LISTBASE_FOREACH (CollectionPointerLink *, link, &lb) {
-          Object *ob = (Object *)link->ptr.owner_id;
-          if (ob->data) {
-            ID *id_data = static_cast<ID *>(ob->data);
+      if (!lb.is_empty()) {
+        for (const PointerRNA &ob_ptr : lb) {
+          Object *ob = (Object *)ob_ptr.owner_id;
+          if (ID *id_data = static_cast<ID *>(ob->data)) {
             id_data->tag |= LIB_TAG_DOIT;
           }
         }
 
-        LISTBASE_FOREACH_MUTABLE (CollectionPointerLink *, link, &lb) {
-          Object *ob = (Object *)link->ptr.owner_id;
+        blender::Vector<PointerRNA> new_lb;
+        for (const PointerRNA &link : lb) {
+          Object *ob = (Object *)link.owner_id;
           ID *id_data = static_cast<ID *>(ob->data);
-
           if ((id_data == nullptr) || (id_data->tag & LIB_TAG_DOIT) == 0 ||
               ID_IS_LINKED(id_data) || (GS(id_data->name) != id_code))
           {
-            BLI_remlink(&lb, link);
-            MEM_freeN(link);
+            continue;
           }
-          else {
-            /* Avoid prepending 'data' to the path. */
-            link->ptr = RNA_id_pointer_create(id_data);
-          }
+          /* Avoid prepending 'data' to the path. */
+          new_lb.append(RNA_id_pointer_create(id_data));
 
           if (id_data) {
             id_data->tag &= ~LIB_TAG_DOIT;
           }
         }
+
+        lb = std::move(new_lb);
       }
 
       *r_lb = lb;
@@ -1449,8 +1298,8 @@ bool UI_context_copy_to_selected_list(bContext *C,
       /* Sequencer's ID is scene :/ */
       /* Try to recursively find an RNA_Sequence ancestor,
        * to handle situations like #41062... */
-      if ((*r_path = RNA_path_resolve_from_type_to_property(ptr, prop, &RNA_Sequence)) != nullptr)
-      {
+      *r_path = RNA_path_resolve_from_type_to_property(ptr, prop, &RNA_Sequence);
+      if (r_path->has_value()) {
         /* Special case when we do this for 'Sequence.lock'.
          * (if the sequence is locked, it won't be in "selected_editable_sequences"). */
         const char *prop_id = RNA_property_identifier(prop);
@@ -1467,14 +1316,14 @@ bool UI_context_copy_to_selected_list(bContext *C,
         }
       }
     }
-    return (*r_path != nullptr);
+    return r_path->has_value();
   }
   else {
     return false;
   }
 
   if (RNA_property_is_idprop(prop)) {
-    if (*r_path == nullptr) {
+    if (!r_path->has_value()) {
       *r_path = RNA_path_from_ptr_to_property_index(ptr, prop, 0, -1);
       BLI_assert(*r_path);
     }
@@ -1485,47 +1334,42 @@ bool UI_context_copy_to_selected_list(bContext *C,
   if (ensure_list_items_contain_prop) {
     if (is_rna) {
       const char *prop_id = RNA_property_identifier(prop);
-      LISTBASE_FOREACH_MUTABLE (CollectionPointerLink *, link, r_lb) {
-        if ((ptr->type != link->ptr.type) &&
-            (RNA_struct_type_find_property(link->ptr.type, prop_id) != prop))
+      r_lb->remove_if([&](const PointerRNA &link) {
+        if ((ptr->type != link.type) &&
+            (RNA_struct_type_find_property(link.type, prop_id) != prop))
         {
-          BLI_remlink(r_lb, link);
-          MEM_freeN(link);
+          return true;
         }
-      }
+        return false;
+      });
     }
     else {
       const bool prop_is_array = RNA_property_array_check(prop);
       const int prop_array_len = prop_is_array ? RNA_property_array_length(ptr, prop) : -1;
       const PropertyType prop_type = RNA_property_type(prop);
-      LISTBASE_FOREACH_MUTABLE (CollectionPointerLink *, link, r_lb) {
+      r_lb->remove_if([&](PointerRNA &link) {
         PointerRNA lptr;
         PropertyRNA *lprop = nullptr;
-        RNA_path_resolve_property(&link->ptr, *r_path, &lptr, &lprop);
+        RNA_path_resolve_property(
+            &link, r_path->has_value() ? r_path->value().c_str() : nullptr, &lptr, &lprop);
 
-        bool remove = false;
         if (lprop == nullptr) {
-          remove = true;
+          return true;
         }
-        else if (!RNA_property_is_idprop(lprop)) {
-          remove = true;
+        if (!RNA_property_is_idprop(lprop)) {
+          return true;
         }
-        else if (prop_type != RNA_property_type(lprop)) {
-          remove = true;
+        if (prop_type != RNA_property_type(lprop)) {
+          return true;
         }
-        else if (prop_is_array != RNA_property_array_check(lprop)) {
-          remove = true;
+        if (prop_is_array != RNA_property_array_check(lprop)) {
+          return true;
         }
-        else if (prop_is_array && (prop_array_len != RNA_property_array_length(&link->ptr, lprop)))
-        {
-          remove = true;
+        if (prop_is_array && (prop_array_len != RNA_property_array_length(&link, lprop))) {
+          return true;
         }
-
-        if (remove) {
-          BLI_remlink(r_lb, link);
-          MEM_freeN(link);
-        }
-      }
+        return false;
+      });
     }
   }
 
@@ -1647,18 +1491,23 @@ static bool copy_to_selected_button(bContext *C, bool all, bool poll)
   }
 
   bool success = false;
-  char *path = nullptr;
+  std::optional<std::string> path;
   bool use_path_from_id;
-  ListBase lb = {nullptr};
+  blender::Vector<PointerRNA> lb;
 
   if (UI_context_copy_to_selected_list(C, &ptr, prop, &lb, &use_path_from_id, &path)) {
-    LISTBASE_FOREACH (CollectionPointerLink *, link, &lb) {
-      if (link->ptr.data == ptr.data) {
+    for (PointerRNA &link : lb) {
+      if (link.data == ptr.data) {
         continue;
       }
 
-      if (!UI_context_copy_to_selected_check(
-              &ptr, &link->ptr, prop, path, use_path_from_id, &lptr, &lprop))
+      if (!UI_context_copy_to_selected_check(&ptr,
+                                             &link,
+                                             prop,
+                                             path.has_value() ? path->c_str() : nullptr,
+                                             use_path_from_id,
+                                             &lptr,
+                                             &lprop))
       {
         continue;
       }
@@ -1673,9 +1522,6 @@ static bool copy_to_selected_button(bContext *C, bool all, bool poll)
       }
     }
   }
-
-  MEM_SAFE_FREE(path);
-  BLI_freelistN(&lb);
 
   return success;
 }
@@ -1757,7 +1603,7 @@ static bool jump_to_target_ptr(bContext *C, PointerRNA ptr, const bool poll)
     base = BKE_view_layer_base_find(view_layer, (Object *)ptr.owner_id);
   }
   else if (OB_DATA_SUPPORT_ID(id_type)) {
-    base = ED_object_find_first_by_data_id(scene, view_layer, ptr.owner_id);
+    base = blender::ed::object::find_first_by_data_id(scene, view_layer, ptr.owner_id);
   }
 
   bool ok = false;
@@ -1772,10 +1618,10 @@ static bool jump_to_target_ptr(bContext *C, PointerRNA ptr, const bool poll)
     const bool reveal_hidden = true;
     /* Select and activate the target. */
     if (target_type == &RNA_Bone) {
-      ok = ED_object_jump_to_bone(C, base->object, bone_name, reveal_hidden);
+      ok = blender::ed::object::jump_to_bone(C, base->object, bone_name, reveal_hidden);
     }
     else if (target_type == &RNA_Object) {
-      ok = ED_object_jump_to_object(C, base->object, reveal_hidden);
+      ok = blender::ed::object::jump_to_object(C, base->object, reveal_hidden);
     }
     else {
       BLI_assert(0);
@@ -1821,7 +1667,7 @@ static bool jump_to_target_button(bContext *C, bool poll)
         char *str_ptr = RNA_property_string_get_alloc(
             &ptr, prop, str_buf, sizeof(str_buf), nullptr);
 
-        int found = 0;
+        bool found = false;
         /* Jump to target only works with search properties currently, not search callbacks yet.
          * See ui_but_add_search. */
         if (coll_search->search_prop != nullptr) {
@@ -1928,8 +1774,7 @@ static bool ui_editsource_uibut_match(uiBut *but_a, uiBut *but_b)
    * if this fails it only means edit-source fails - campbell */
   if (BLI_rctf_compare(&but_a->rect, &but_b->rect, FLT_EPSILON) && (but_a->type == but_b->type) &&
       (but_a->rnaprop == but_b->rnaprop) && (but_a->optype == but_b->optype) &&
-      (but_a->unit_type == but_b->unit_type) &&
-      STREQLEN(but_a->drawstr, but_b->drawstr, UI_MAX_DRAW_STR))
+      (but_a->unit_type == but_b->unit_type) && but_a->drawstr == but_b->drawstr)
   {
     return true;
   }
@@ -2537,32 +2382,27 @@ static void UI_OT_list_start_filter(wmOperatorType *ot)
 /** \name UI View Start Filter Operator
  * \{ */
 
-static AbstractView *get_view_focused(bContext *C)
+static bool ui_view_focused_poll(bContext *C)
 {
   const wmWindow *win = CTX_wm_window(C);
   if (!(win && win->eventstate)) {
-    return nullptr;
+    return false;
   }
 
   const ARegion *region = CTX_wm_region(C);
   if (!region) {
-    return nullptr;
+    return false;
   }
-  return reinterpret_cast<AbstractView*>(UI_region_view_find_at(region, win->eventstate->xy, 0));
-}
-
-static bool ui_view_focused_poll(bContext *C)
-{
-  const AbstractView *view = get_view_focused(C);
+  const blender::ui::AbstractView *view = UI_region_view_find_at(region, win->eventstate->xy, 0);
   return view != nullptr;
 }
 
 static int ui_view_start_filter_invoke(bContext *C, wmOperator * /*op*/, const wmEvent *event)
 {
   const ARegion *region = CTX_wm_region(C);
-  const uiViewHandle *hovered_view = UI_region_view_find_at(region, event->xy, 0);
+  const blender::ui::AbstractView *hovered_view = UI_region_view_find_at(region, event->xy, 0);
 
-  if (!UI_view_begin_filtering(C, hovered_view)) {
+  if (!hovered_view->begin_filtering(*C)) {
     return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
   }
 
@@ -2635,72 +2475,6 @@ static void UI_OT_view_drop(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name UI View Drop Operator
- * \{ */
-
-static bool ui_view_scroll_poll(bContext *C)
-{
-  const AbstractView *view = get_view_focused(C);
-  if (!view) {
-    return false;
-  }
-
-  return view->supports_scrolling();
-}
-
-static int ui_view_scroll_invoke(bContext *C, wmOperator * /*op*/, const wmEvent *event)
-{
-  ARegion *region = CTX_wm_region(C);
-  int type = event->type;
-  bool invert_direction = false;
-
-  if (type == MOUSEPAN) {
-    int dummy_val;
-    ui_pan_to_scroll(event, &type, &dummy_val);
-
-    /* 'ui_pan_to_scroll' gives the absolute direction. */
-    if (event->flag & WM_EVENT_SCROLL_INVERT) {
-      invert_direction = true;
-    }
-  }
-
-  AbstractView *view = get_view_focused(C);
-  std::optional<ViewScrollDirection> direction =
-      [type, invert_direction]() -> std::optional<ViewScrollDirection> {
-    switch (type) {
-      case WHEELUPMOUSE:
-        return invert_direction ? ViewScrollDirection::DOWN : ViewScrollDirection::UP;
-      case WHEELDOWNMOUSE:
-        return invert_direction ? ViewScrollDirection::UP : ViewScrollDirection::DOWN;
-      default:
-        return std::nullopt;
-    }
-  }();
-  if (!direction) {
-    return OPERATOR_CANCELLED;
-  }
-
-  BLI_assert(view->supports_scrolling());
-  view->scroll(*direction);
-
-  ED_region_tag_redraw(region);
-  return OPERATOR_FINISHED;
-}
-
-static void UI_OT_view_scroll(wmOperatorType *ot)
-{
-  ot->name = "View Scroll";
-  ot->idname = "UI_OT_view_scroll";
-
-  ot->invoke = ui_view_scroll_invoke;
-  ot->poll = ui_view_scroll_poll;
-
-  ot->flag = OPTYPE_INTERNAL;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name UI View Item Rename Operator
  *
  * General purpose renaming operator for views. Thanks to this, to add a rename button to context
@@ -2715,16 +2489,16 @@ static bool ui_view_item_rename_poll(bContext *C)
   if (region == nullptr) {
     return false;
   }
-  const uiViewItemHandle *active_item = UI_region_views_find_active_item(region);
-  return active_item != nullptr && UI_view_item_can_rename(active_item);
+  const blender::ui::AbstractViewItem *active_item = UI_region_views_find_active_item(region);
+  return active_item != nullptr && UI_view_item_can_rename(*active_item);
 }
 
 static int ui_view_item_rename_exec(bContext *C, wmOperator * /*op*/)
 {
   ARegion *region = CTX_wm_region(C);
-  uiViewItemHandle *active_item = UI_region_views_find_active_item(region);
+  blender::ui::AbstractViewItem *active_item = UI_region_views_find_active_item(region);
 
-  UI_view_item_begin_rename(active_item);
+  UI_view_item_begin_rename(*active_item);
   ED_region_tag_redraw(region);
 
   return OPERATOR_FINISHED;
@@ -2770,7 +2544,7 @@ static int ui_drop_material_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
 
-  Material *ma = (Material *)WM_operator_properties_id_lookup_from_name_or_session_uuid(
+  Material *ma = (Material *)WM_operator_properties_id_lookup_from_name_or_session_uid(
       bmain, op->ptr, ID_MA);
   if (ma == nullptr) {
     return OPERATOR_CANCELLED;
@@ -2820,9 +2594,9 @@ static void UI_OT_drop_material(wmOperatorType *ot)
 
 void ED_operatortypes_ui()
 {
+  using namespace blender::ui;
   WM_operatortype_append(UI_OT_copy_data_path_button);
   WM_operatortype_append(UI_OT_copy_as_driver_button);
-  WM_operatortype_append(UI_OT_show_fcurve_in_editor);
   WM_operatortype_append(UI_OT_copy_python_command_button);
   WM_operatortype_append(UI_OT_reset_default_button);
   WM_operatortype_append(UI_OT_assign_default_button);
@@ -2844,7 +2618,6 @@ void ED_operatortypes_ui()
 
   WM_operatortype_append(UI_OT_view_start_filter);
   WM_operatortype_append(UI_OT_view_drop);
-  WM_operatortype_append(UI_OT_view_scroll);
   WM_operatortype_append(UI_OT_view_item_rename);
 
   WM_operatortype_append(UI_OT_override_type_set_button);

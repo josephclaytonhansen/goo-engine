@@ -6,7 +6,7 @@
  * \ingroup EEVEE
  */
 
-#include "eevee_private.h"
+#include "eevee_private.hh"
 
 #include "BLI_math_rotation.h"
 
@@ -189,11 +189,13 @@ void EEVEE_shadows_draw_cubemap(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata,
   for (int j = 0; j < 6; j++) {
     /* Optimization: Only render the needed faces. */
     /* Skip all but -Z face. */
-    if (evli->light_type == LA_SPOT && j != 5 && spot_angle_fit_single_face(evli)) {
+    if ((ELEM(evli->light_type, LA_SPOT, LAMPTYPE_SPOT_DISK)) && j != 5 &&
+        spot_angle_fit_single_face(evli))
+    {
       continue;
     }
     /* Skip +Z face. */
-    if (evli->light_type != LA_LOCAL && j == 4) {
+    if (!(ELEM(evli->light_type, LA_LOCAL, LAMPTYPE_OMNI_DISK)) && j == 4) {
       continue;
     }
     /* TODO(fclem): some cube sides can be invisible in the main views. Cull them. */
@@ -203,7 +205,6 @@ void EEVEE_shadows_draw_cubemap(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata,
     DRW_view_set_active(g_data->cube_views[j]);
     int layer = cube_index * 6 + j;
     GPU_framebuffer_texture_layer_attach(sldata->shadow_fb, sldata->shadow_cube_pool, 0, layer, 0);
-    GPU_framebuffer_texture_layer_attach(sldata->shadow_fb, sldata->shadow_cube_id_pool, 1, layer, 0);
     GPU_framebuffer_bind(sldata->shadow_fb);
     GPU_framebuffer_clear_depth(sldata->shadow_fb, 1.0f);
     DRW_draw_pass(psl->shadow_pass);

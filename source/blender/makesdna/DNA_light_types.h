@@ -73,16 +73,18 @@ typedef struct Light {
   float contact_bias;
   float contact_thickness;
 
-  float diff_fac, volume_fac;
-  float spec_fac, att_dist;
+  float diff_fac;
+  float spec_fac;
+  float transmission_fac;
+  float volume_fac;
+
+  float att_dist;
   float shadow_softness_factor;
   float shadow_trace_distance;
-  float _pad3;
+  float shadow_filter_radius;
+  float shadow_resolution_scale;
 
-  /* Goo-engine */
-  int light_group_bits[4];
-
-  /* preview */
+  /* Preview */
   struct PreviewImage *preview;
 
   /* Nodes */
@@ -105,8 +107,6 @@ enum {
    */
   LA_DS_SHOW_TEXS = 1 << 2,
 };
-
-#define LA_GROUPS_ALL 0xFFFFFFFF
 
 /** #Light::type */
 enum {
@@ -144,6 +144,7 @@ enum {
   // LA_SHOW_SHADOW_BOX = 1 << 18,
   LA_SHAD_CONTACT = 1 << 19,
   LA_CUSTOM_ATTENUATION = 1 << 20,
+  LA_USE_SOFT_FALLOFF = 1 << 21,
 };
 
 /** #Light::falloff_type */

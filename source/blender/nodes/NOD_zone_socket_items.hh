@@ -57,6 +57,7 @@ struct SimulationItemsAccessor {
                 SOCK_RGBA,
                 SOCK_BOOLEAN,
                 SOCK_ROTATION,
+                SOCK_MATRIX,
                 SOCK_INT,
                 SOCK_STRING,
                 SOCK_GEOMETRY);
@@ -121,6 +122,7 @@ struct RepeatItemsAccessor {
                 SOCK_RGBA,
                 SOCK_BOOLEAN,
                 SOCK_ROTATION,
+                SOCK_MATRIX,
                 SOCK_INT,
                 SOCK_STRING,
                 SOCK_GEOMETRY,

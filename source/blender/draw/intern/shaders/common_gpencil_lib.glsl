@@ -72,19 +72,12 @@ float gpencil_stroke_thickness_modulate(float thickness, vec4 ndc_pos, vec4 view
   if (gpThicknessIsScreenSpace) {
     /* Multiply offset by view Z so that offset is constant in screen-space.
      * (e.i: does not change with the distance to camera) */
-    thickness *= ndc_pos.w *
-                 -gpThicknessWorldScale;  // Multiply by positive world scale (default 1.0).
+    thickness *= ndc_pos.w;
   }
   else {
     /* World space point size. */
     thickness *= gpThicknessWorldScale * ProjectionMatrix[1][1] * viewport_size.y;
   }
-
-  if (gpThicknessFixedWorldScale) {
-    /* 0.1 factor is evil, but makes thickness align better with pre-existing world scale. */
-    thickness *= ndc_pos.w * 0.1;
-  }
-
   return thickness;
 }
 
@@ -254,18 +247,18 @@ vec4 gpencil_vertex(vec4 viewport_size,
     out_hardness = gpencil_decode_hardness(use_curr ? hardness1 : hardness2);
 
     if (is_dot) {
-      uint alignement_mode = material_flags & GP_STROKE_ALIGNMENT;
+      uint alignment_mode = material_flags & GP_STROKE_ALIGNMENT;
 
       /* For one point strokes use object alignment. */
-      if (alignement_mode == GP_STROKE_ALIGNMENT_STROKE && ma.x == -1 && ma2.x == -1) {
-        alignement_mode = GP_STROKE_ALIGNMENT_OBJECT;
+      if (alignment_mode == GP_STROKE_ALIGNMENT_STROKE && ma.x == -1 && ma2.x == -1) {
+        alignment_mode = GP_STROKE_ALIGNMENT_OBJECT;
       }
 
       vec2 x_axis;
-      if (alignement_mode == GP_STROKE_ALIGNMENT_STROKE) {
+      if (alignment_mode == GP_STROKE_ALIGNMENT_STROKE) {
         x_axis = (ma2.x == -1) ? line_adj : line;
       }
-      else if (alignement_mode == GP_STROKE_ALIGNMENT_FIXED) {
+      else if (alignment_mode == GP_STROKE_ALIGNMENT_FIXED) {
         /* Default for no-material drawing. */
         x_axis = vec2(1.0, 0.0);
       }

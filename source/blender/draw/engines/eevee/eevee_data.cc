@@ -13,16 +13,16 @@
 #include "BLI_ghash.h"
 #include "BLI_memblock.h"
 
-#include "BKE_duplilist.h"
+#include "BKE_duplilist.hh"
 #include "BKE_modifier.hh"
 #include "BKE_object.hh"
 
 #include "DEG_depsgraph_query.hh"
 
-#include "GPU_vertex_buffer.h"
+#include "GPU_vertex_buffer.hh"
 
 #include "eevee_lightcache.h"
-#include "eevee_private.h"
+#include "eevee_private.hh"
 
 /* Motion Blur data. */
 
@@ -203,8 +203,6 @@ void EEVEE_view_layer_data_free(void *storage)
   GPU_FRAMEBUFFER_FREE_SAFE(sldata->shadow_fb);
   DRW_TEXTURE_FREE_SAFE(sldata->shadow_cube_pool);
   DRW_TEXTURE_FREE_SAFE(sldata->shadow_cascade_pool);
-  DRW_TEXTURE_FREE_SAFE(sldata->shadow_cube_id_pool);
-  DRW_TEXTURE_FREE_SAFE(sldata->shadow_cascade_id_pool);
   for (int i = 0; i < 2; i++) {
     MEM_SAFE_FREE(sldata->shcasters_buffers[i].bbox);
     MEM_SAFE_FREE(sldata->shcasters_buffers[i].update);

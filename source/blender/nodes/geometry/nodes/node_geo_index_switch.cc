@@ -4,8 +4,6 @@
 
 #include "node_geometry_util.hh"
 
-#include "BLI_array_utils.hh"
-
 #include "UI_interface.hh"
 #include "UI_resources.hh"
 
@@ -297,6 +295,7 @@ static void node_rna(StructRNA *srna)
                                                SOCK_INT,
                                                SOCK_BOOLEAN,
                                                SOCK_ROTATION,
+                                               SOCK_MATRIX,
                                                SOCK_VECTOR,
                                                SOCK_STRING,
                                                SOCK_RGBA,
@@ -304,7 +303,8 @@ static void node_rna(StructRNA *srna)
                                                SOCK_OBJECT,
                                                SOCK_COLLECTION,
                                                SOCK_MATERIAL,
-                                               SOCK_IMAGE);
+                                               SOCK_IMAGE,
+                                               SOCK_MENU);
                                  });
       });
 }

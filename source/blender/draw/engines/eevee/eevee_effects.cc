@@ -10,13 +10,13 @@
 
 #include "DRW_render.hh"
 
-#include "BKE_global.h" /* for G.debug_value */
+#include "BKE_global.hh" /* for G.debug_value */
 
-#include "GPU_capabilities.h"
-#include "GPU_platform.h"
-#include "GPU_state.h"
-#include "GPU_texture.h"
-#include "eevee_private.h"
+#include "GPU_capabilities.hh"
+#include "GPU_platform.hh"
+#include "GPU_state.hh"
+#include "GPU_texture.hh"
+#include "eevee_private.hh"
 
 static struct {
   /* These are just references, not actually allocated */
@@ -245,7 +245,7 @@ void EEVEE_effects_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     downsample_write = DRW_STATE_WRITE_COLOR;
   }
 
-  GPUBatch *quad = DRW_cache_fullscreen_quad_get();
+  blender::gpu::Batch *quad = DRW_cache_fullscreen_quad_get();
 
   if (effects->enabled_effects & EFFECT_RADIANCE_BUFFER) {
     DRW_PASS_CREATE(psl->color_copy_ps, DRW_STATE_WRITE_COLOR);
@@ -427,23 +427,6 @@ void EEVEE_effects_downsample_radiance_buffer(EEVEE_Data *vedata, GPUTexture *te
   GPU_framebuffer_recursive_downsample(
       fbl->radiance_filtered_fb, MAX_SCREEN_BUFFERS_LOD_LEVEL, &downsample_radiance_cb, vedata);
   DRW_stats_group_end();
-}
-
-void EEVEE_effects_radiance_copy(EEVEE_ViewLayerData */*sldata*/, EEVEE_Data *vedata)
-{
-  EEVEE_FramebufferList *fbl = vedata->fbl;
-  EEVEE_PassList *psl = vedata->psl;
-  EEVEE_StorageList *stl = vedata->stl;
-  EEVEE_EffectsInfo *effects = stl->effects;
-
-  /* Copy color buffer to texture */
-  if ((effects->enabled_effects & EFFECT_REFRACT) != 0) {
-    GPU_framebuffer_bind(fbl->radiance_filtered_fb);
-    DRW_draw_pass(psl->color_copy_ps);
-
-    /* Restore */
-    GPU_framebuffer_bind(fbl->main_fb);
-  }
 }
 
 void EEVEE_downsample_cube_buffer(EEVEE_Data *vedata, GPUTexture *texture_src, int level)

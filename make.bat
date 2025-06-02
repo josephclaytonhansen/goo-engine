@@ -1,7 +1,8 @@
 @echo off
 REM This batch file does an out-of-source CMake build in ../build_windows
 REM This is for users who like to configure & build Blender with a single command.
-setlocal ENABLEEXTENSIONS EnableDelayedExpansion
+setlocal EnableDelayedExpansion
+setlocal ENABLEEXTENSIONS
 set BLENDER_DIR=%~dp0
 
 call "%BLENDER_DIR%\build_files\windows\reset_variables.cmd"
@@ -54,14 +55,6 @@ if "%BUILD_VS_YEAR%" == "" (
 		goto EOF
 	)
 )
-echo ---- DEBUG make.bat: PATH after MSVC detection ----
-echo PATH=%PATH%
-echo ---- /DEBUG make.bat ----
-
-if "%SVN_FIX%" == "1" (
-	call "%BLENDER_DIR%\build_files\windows\svn_fix.cmd"
-	goto EOF
-)
 
 if "%BUILD_UPDATE%" == "1" (
 	REM First see if the SVN libs are there and check them out if they are not.
@@ -72,36 +65,12 @@ if "%BUILD_UPDATE%" == "1" (
 		REM running tends to be problematic. The python script that update_sources
 		REM calls later on may still try to switch branches and run into trouble,
 		REM but for *most* people this will side step the problem.
-		call "%BLENDER_DIR%\build_files\windows\svn_update.cmd"
+		call "%BLENDER_DIR%\build_files\windows\lib_update.cmd"
 	)
 	REM Finally call the python script shared between all platforms that updates git
 	REM and does any other SVN work like update the tests or branch switches
 	REM if required.
-
-	REM Default to VS2022 and set svn-branch for 'make update' if not specified.
-	REM This is placed here to avoid issues if prior called scripts use 'endlocal'.
-	if "%BUILD_VS_YEAR%" == "" (
-		echo Note: 'update' target specified without a Visual Studio year. Defaulting to VS2022 for this operation.
-		set BUILD_VS_YEAR=2022
-	)
-
-	echo Note: Goo Engine is based on Blender 4.1. Forcing SVN library base to "tags/blender-4.1-release" and library version to "vc15" for 'make update'.
-	set "TEMP_SVN_BRANCH_ARG=--svn-branch tags/blender-4.1-release"
-	set "TEMP_VC_VERSION_ARG=--windows-vc-version vc15"
-
-	REM Check the value of BUILD_UPDATE_ARGS as it was before this IF block (e.g. from parse_arguments.cmd)
-	if "%BUILD_UPDATE_ARGS%"=="" ( 
-		set "BUILD_UPDATE_ARGS=!TEMP_SVN_BRANCH_ARG! !TEMP_VC_VERSION_ARG!"
-	) else (
-		REM Append to existing BUILD_UPDATE_ARGS. Use %BUILD_UPDATE_ARGS% for its pre-block value,
-		REM and !TEMP_...% for values set within this block.
-		set "BUILD_UPDATE_ARGS=%BUILD_UPDATE_ARGS% !TEMP_SVN_BRANCH_ARG! !TEMP_VC_VERSION_ARG!"
-	)
-		echo ---- DEBUG make.bat: BUILD_UPDATE_ARGS before calling update_sources.cmd ----
-		REM Echo the value of BUILD_UPDATE_ARGS as it was just set in this block
-		echo BUILD_UPDATE_ARGS=!BUILD_UPDATE_ARGS!
-		echo ---- /DEBUG ----
-	call "%BLENDER_DIR%\build_files\windows\update_sources.cmd" --addons-repo-name goo-blender-addons
+	call "%BLENDER_DIR%\build_files\windows\update_sources.cmd"
 	goto EOF
 )
 
@@ -131,14 +100,9 @@ if "%CMAKE%" == "" (
 
 echo Building blender with VS%BUILD_VS_YEAR% for %BUILD_ARCH% in %BUILD_DIR%
 
-echo ---- DEBUG make.bat: PATH before check_libraries/configure_msbuild ----
-echo PATH=%PATH%
-echo ---- /DEBUG make.bat ----
-
-@echo on
 call "%BLENDER_DIR%\build_files\windows\check_libraries.cmd"
-@echo off
 if errorlevel 1 goto EOF
+
 if "%TEST%" == "1" (
 	call "%BLENDER_DIR%\build_files\windows\test.cmd"
 	goto EOF

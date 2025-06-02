@@ -37,7 +37,6 @@ struct bContext;
 struct uiBlock;
 struct uiButViewItem;
 struct uiLayout;
-struct uiViewItemHandle;
 struct ViewLink;
 struct wmDrag;
 struct wmNotifier;
@@ -47,18 +46,13 @@ namespace blender::ui {
 class AbstractViewItem;
 class AbstractViewItemDragController;
 
-enum class ViewScrollDirection {
-  UP,
-  DOWN,
-};
-
 class AbstractView {
   friend class AbstractViewItem;
   friend struct ::ViewLink;
 
   bool is_reconstructed_ = false;
   /**
-   * Only one item can be renamed at a time. So rather than giving each item an own rename buffer
+   * Only one item can be renamed at a time. So rather than giving each item its own rename buffer
    * (which just adds unused memory in most cases), have one here that is managed by the view.
    *
    * This fixed-size buffer is needed because that's what the rename button requires. In future we
@@ -91,12 +85,9 @@ class AbstractView {
    */
   virtual bool begin_filtering(const bContext &C) const;
 
-  virtual void draw_overlays(const ARegion &region, const uiBlock &block) const;
+  virtual void draw_overlays(const ARegion &region) const;
 
   virtual void foreach_view_item(FunctionRef<void(AbstractViewItem &)> iter_fn) const = 0;
-
-  virtual bool supports_scrolling() const;
-  virtual void scroll(ViewScrollDirection direction);
 
   /**
    * Makes \a item valid for display in this view. Behavior is undefined for items not registered
@@ -259,9 +250,6 @@ class AbstractViewItem {
   void end_renaming();
   void rename_apply(const bContext &C);
 
-  template<typename ToType = AbstractViewItem>
-  static ToType *from_item_handle(uiViewItemHandle *handle);
-
  protected:
   AbstractViewItem() = default;
 
@@ -310,14 +298,6 @@ class AbstractViewItem {
    */
   void add_rename_button(uiBlock &block);
 };
-
-template<typename ToType> ToType *AbstractViewItem::from_item_handle(uiViewItemHandle *handle)
-{
-  static_assert(std::is_base_of<AbstractViewItem, ToType>::value,
-                "Type must derive from and implement the AbstractViewItem interface");
-
-  return dynamic_cast<ToType *>(reinterpret_cast<AbstractViewItem *>(handle));
-}
 
 /* ---------------------------------------------------------------------- */
 /** \name Drag 'n Drop

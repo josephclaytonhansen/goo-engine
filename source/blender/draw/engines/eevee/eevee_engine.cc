@@ -8,11 +8,11 @@
 
 #include "DRW_render.hh"
 
-#include "draw_color_management.h" /* TODO: remove dependency. */
+#include "draw_color_management.hh" /* TODO: remove dependency. */
 
 #include "BLI_rand.h"
 
-#include "BLT_translation.h"
+#include "BLT_translation.hh"
 
 #include "BKE_object.hh"
 
@@ -20,11 +20,11 @@
 
 #include "DNA_world_types.h"
 
-#include "GPU_context.h"
+#include "GPU_context.hh"
 
-#include "IMB_imbuf.h"
+#include "IMB_imbuf.hh"
 
-#include "eevee_private.h"
+#include "eevee_private.hh"
 
 #include "eevee_engine.h" /* own include */
 
@@ -168,14 +168,7 @@ static void eevee_cache_finish(void *vedata)
   EEVEE_volumes_draw_init(sldata, static_cast<EEVEE_Data *>(vedata));
 
   uint tot_samples = scene_eval->eevee.taa_render_samples;
-  uint vl_samples = draw_ctx->view_layer->samples;
-
-  if (vl_samples > 0){
-    tot_samples = vl_samples;
-  }
-  
   if (tot_samples == 0) {
-
     /* Use a high number of samples so the outputs accumulation buffers
      * will have the highest possible precision. */
     tot_samples = 1024;
@@ -333,9 +326,6 @@ static void eevee_draw_scene(void *vedata)
     DRW_draw_pass(psl->material_refract_ps);
     DRW_stats_group_end();
 
-    /* Streamlined version of EEVEE_refraction_compute to just copy the colour buffer */
-    EEVEE_effects_radiance_copy(sldata, static_cast<EEVEE_Data *>(vedata));
-
     /* Volumetrics Resolve Opaque */
     EEVEE_volumes_resolve(sldata, static_cast<EEVEE_Data *>(vedata));
 
@@ -482,7 +472,7 @@ static void eevee_render_to_image(void *vedata,
   Depsgraph *depsgraph = draw_ctx->depsgraph;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   EEVEE_ViewLayerData *sldata = EEVEE_view_layer_data_ensure();
-  const bool do_motion_blur = (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) != 0;
+  const bool do_motion_blur = (scene->r.mode & R_MBLUR) != 0;
   const bool do_motion_blur_fx = do_motion_blur && (scene->eevee.motion_blur_max > 0);
 
   if (!EEVEE_render_init(static_cast<EEVEE_Data *>(vedata), engine, depsgraph)) {
@@ -492,7 +482,7 @@ static void eevee_render_to_image(void *vedata,
 
   int initial_frame = scene->r.cfra;
   float initial_subframe = scene->r.subframe;
-  float shuttertime = (do_motion_blur) ? scene->eevee.motion_blur_shutter : 0.0f;
+  float shuttertime = (do_motion_blur) ? scene->r.motion_blur_shutter : 0.0f;
   int time_steps_tot = (do_motion_blur) ? max_ii(1, scene->eevee.motion_blur_steps) : 1;
   g_data->render_timesteps = time_steps_tot;
 
@@ -506,14 +496,14 @@ static void eevee_render_to_image(void *vedata,
 
   /* Compute start time. The motion blur will cover `[time ...time + shuttertime]`. */
   float time = initial_frame + initial_subframe;
-  switch (scene->eevee.motion_blur_position) {
-    case SCE_EEVEE_MB_START:
+  switch (scene->r.motion_blur_position) {
+    case SCE_MB_START:
       /* No offset. */
       break;
-    case SCE_EEVEE_MB_CENTER:
+    case SCE_MB_CENTER:
       time -= shuttertime * 0.5f;
       break;
-    case SCE_EEVEE_MB_END:
+    case SCE_MB_END:
       time -= shuttertime;
       break;
     default:
@@ -678,7 +668,7 @@ RenderEngineType DRW_engine_viewport_eevee_type = {
     /*next*/ nullptr,
     /*prev*/ nullptr,
     /*idname*/ EEVEE_ENGINE,
-    /*name*/ N_("Fruitbat (Legacy)"),
+    /*name*/ N_("EEVEE"),
     /*flag*/ RE_INTERNAL | RE_USE_PREVIEW | RE_USE_STEREO_VIEWPORT | RE_USE_GPU_CONTEXT,
     /*update*/ nullptr,
     /*render*/ &DRW_render_to_image,

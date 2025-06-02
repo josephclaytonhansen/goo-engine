@@ -191,10 +191,6 @@ DEF_ENUM(rna_enum_node_float_to_int_items)
 DEF_ENUM(rna_enum_node_map_range_items)
 DEF_ENUM(rna_enum_node_clamp_items)
 
-DEF_ENUM(rna_enum_node_sdf_primitive_items)
-DEF_ENUM(rna_enum_node_sdf_op_items)
-DEF_ENUM(rna_enum_node_sdf_vector_op_items)
-
 DEF_ENUM(rna_enum_ramp_blend_items)
 
 DEF_ENUM(rna_enum_prop_dynamicpaint_type_items)
@@ -256,6 +252,7 @@ DEF_ENUM(rna_enum_transform_orientation_items)
 DEF_ENUM(rna_enum_velocity_unit_items)
 
 DEF_ENUM(rna_enum_curves_type_items)
+DEF_ENUM(rna_enum_curves_handle_type_items)
 DEF_ENUM(rna_enum_curve_normal_mode_items)
 
 /* Not available to RNA pre-processing (`makesrna`).
