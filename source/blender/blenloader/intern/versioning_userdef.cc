@@ -138,6 +138,7 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     FROM_DEFAULT_V4_UCHAR(space_view3d.edge_mode_select);
     FROM_DEFAULT_V4_UCHAR(space_view3d.face_select);
     FROM_DEFAULT_V4_UCHAR(space_view3d.face_mode_select);
+    FROM_DEFAULT_V4_UCHAR(tui.icon_autokey);
   }
 
   /**
