@@ -59,6 +59,9 @@ static void camera_init_data(ID *id)
   BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(cam, id));
 
   MEMCPY_STRUCT_AFTER(cam, DNA_struct_default_get(Camera), id);
+
+  cam->resolution_x = 1920;
+  cam->resolution_y = 1080;
 }
 
 /**
