@@ -69,6 +69,8 @@
 
 #include "DEG_depsgraph.hh"
 
+#include "DNA_camera_types.h"
+
 #ifdef WITH_OPENEXR
 const EnumPropertyItem rna_enum_exr_codec_items[] = {
     {R_IMF_EXR_CODEC_NONE, "NONE", 0, "None", ""},
