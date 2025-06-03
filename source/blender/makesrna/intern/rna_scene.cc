@@ -2399,9 +2399,13 @@ static void rna_SceneCamera_update(Main * /*bmain*/, Scene * /*scene*/, PointerR
 
   if (camera && (camera->type == OB_CAMERA)) {
     DEG_id_tag_update(&camera->id, ID_RECALC_GEOMETRY);
-    if (camera->resolution_x > 0 && camera->resolution_y > 0) {
-      scene->r.xsch = camera->resolution_x;
-      scene->r.ysch = camera->resolution_y;
+    Object *camera = scene->camera;
+    if (camera && camera->type == OB_CAMERA && camera->data) {
+      Camera *cam = (Camera *)camera->data;
+      if (cam->resolution_x > 0 && cam->resolution_y > 0) {
+        scene->r.xsch = cam->resolution_x;
+        scene->r.ysch = cam->resolution_y;
+      }
     }
   }
 }
