@@ -2407,8 +2407,11 @@ static void rna_SceneCamera_update(Main * /*bmain*/, Scene * /*scene*/, PointerR
       if (cam->resolution_x > 0 && cam->resolution_y > 0) {
         scene->r.xsch = cam->resolution_x;
         scene->r.ysch = cam->resolution_y;
+        WM_main_add_notifier(NC_SCENE | ND_RENDER_SETTINGS, scene);
+        WM_main_add_notifier(NC_SCENE, scene);
         WM_main_add_notifier(NC_SCENE | ND_RENDER_OPTIONS, scene);
         DEG_id_tag_update(&scene->id, ID_RECALC_COPY_ON_WRITE);
+        RNA_property_update_main(G_MAIN, nullptr, &scene->id, nullptr);
       }
     }
   }
