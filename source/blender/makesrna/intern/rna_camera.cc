@@ -22,6 +22,35 @@
 #include "WM_api.hh"
 #include "WM_types.hh"
 
+#include "DNA_camera_types.h"
+#include "DNA_scene_types.h"
+#include "BKE_main.hh"
+#include "DEG_depsgraph.hh"
+
+static void rna_Camera_resolution_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+  Camera *cam = (Camera *)ptr->owner_id;
+
+  // If scene is not provided, try to find the active scene.
+  if (scene == nullptr) {
+    // Use the first scene in Main as a fallback.
+    scene = static_cast<Scene *>(bmain->scenes.first);
+  }
+  if (!scene) {
+    return;
+  }
+
+  // Only update if this camera is the active camera for the scene.
+  if (scene->camera && scene->camera->data == (ID *)cam) {
+    if (cam->resolution_x > 0 && cam->resolution_y > 0) {
+      scene->r.xsch = cam->resolution_x;
+      scene->r.ysch = cam->resolution_y;
+      WM_main_add_notifier(NC_SCENE | ND_RENDER_OPTIONS, scene);
+      DEG_id_tag_update(&scene->id, ID_RECALC_COPY_ON_WRITE);
+    }
+  }
+}
+
 #ifdef RNA_RUNTIME
 
 #  include "BKE_camera.h"
@@ -30,7 +59,10 @@
 #  include "DEG_depsgraph.hh"
 #  include "DEG_depsgraph_build.hh"
 
+
 #  include "SEQ_relations.hh"
+
+#include <DEG_depsgraph.hh>
 
 static float rna_Camera_angle_get(PointerRNA *ptr)
 {
@@ -958,13 +990,13 @@ void RNA_def_camera(BlenderRNA *brna)
   RNA_def_property_int_sdna(prop, NULL, "resolution_x");
   RNA_def_property_range(prop, 4, 10000);
   RNA_def_property_ui_text(prop, "Resolution X", "Camera-specific X resolution in pixels");
-  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Scene_render_update");
+  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Camera_resolution_update");
 
   prop = RNA_def_property(srna, "resolution_y", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "resolution_y");
   RNA_def_property_range(prop, 4, 10000);
   RNA_def_property_ui_text(prop, "Resolution Y", "Camera-specific Y resolution in pixels");
-  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Scene_render_update");
+  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Camera_resolution_update");
 }
 
 #endif
