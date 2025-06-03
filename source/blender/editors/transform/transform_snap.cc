@@ -1797,7 +1797,9 @@ float transform_snap_increment_get(const TransInfo *t)
 
 void tranform_snap_source_restore_context(TransInfo *t)
 {
-  snap_object_context_init(t);
+  if (t->spacetype == SPACE_VIEW3D) {
+    snap_object_context_init(t);
+  }
   snap_multipoints_free(t);
 }
 
