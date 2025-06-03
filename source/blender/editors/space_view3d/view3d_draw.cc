@@ -87,8 +87,8 @@
 
 #include "RNA_access.hh"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "view3d_intern.h" /* own include */
 
@@ -625,7 +625,7 @@ static void drawviewborder(Scene *scene, Depsgraph *depsgraph, ARegion *region, 
   }
 
   /* When overlays are disabled, only show camera outline & passepartout. */
-  if (v3d->flag2 & V3D_HIDE_OVERLAYS || !(v3d->flag2 & V3D_SHOW_CAMERA_GUIDES)) {
+  if (v3d->flag2 & V3D_HIDE_OVERLAYS) {
     return;
   }
 

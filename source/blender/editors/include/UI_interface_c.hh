@@ -9,7 +9,6 @@
 #pragma once
 
 #include <functional>
-#include <optional>
 #include <string>
 
 #include "BLI_compiler_attrs.h"
@@ -1485,12 +1484,6 @@ enum eButProgressType {
   UI_BUT_PROGRESS_TYPE_RING = 1,
 };
 
-enum class LayoutSeparatorType : int8_t {
-  Auto,
-  Space,
-  Line,
-};
-
 /***************************** ID Utilities *******************************/
 
 int UI_icon_from_id(const ID *id);
@@ -2963,9 +2956,7 @@ void uiItemV(uiLayout *layout, const char *name, int icon, int argval);
 /** Separator item */
 void uiItemS(uiLayout *layout);
 /** Separator item */
-void uiItemS_ex(uiLayout *layout,
-                float factor,
-                LayoutSeparatorType type = LayoutSeparatorType::Auto);
+void uiItemS_ex(uiLayout *layout, float factor);
 /** Flexible spacing. */
 void uiItemSpacer(uiLayout *layout);
 

@@ -42,7 +42,7 @@
 #include "DNA_world_types.h"
 
 #include "BKE_animsys.h"
-#include "BKE_appdir.hh"
+#include "BKE_appdir.h"
 #include "BKE_armature.hh"
 #include "BKE_brush.hh"
 #include "BKE_colortools.hh"
@@ -71,9 +71,9 @@
 #include "DEG_depsgraph_build.hh"
 #include "DEG_depsgraph_query.hh"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_thumbs.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_thumbs.h"
 
 #include "BIF_glutil.hh"
 
@@ -513,13 +513,6 @@ static Scene *preview_prepare_scene(
     /* Setup the world. */
     sce->world = ED_preview_prepare_world(
         pr_main, sce, scene->world, static_cast<ID_Type>(id_type), sp->pr_method);
-
-    /* Add preview lights to every light group. */
-    LISTBASE_FOREACH (Light *, ld, &pr_main->lights) {
-      for (int i = 0; i < 4; i++) {
-        ld->light_group_bits[i] = 0xFFFFFFFF;
-      }
-    }
 
     if (id_type == ID_TE) {
       /* Texture is not actually rendered with engine, just set dummy value. */

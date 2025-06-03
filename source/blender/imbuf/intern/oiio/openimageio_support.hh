@@ -14,8 +14,8 @@
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/imageio.h>
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 namespace blender::imbuf {
 

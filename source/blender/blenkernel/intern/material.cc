@@ -53,7 +53,7 @@
 #include "BKE_gpencil_legacy.h"
 #include "BKE_grease_pencil.hh"
 #include "BKE_icons.h"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_image.h"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_query.hh"
@@ -821,14 +821,6 @@ void BKE_id_material_eval_ensure_default_slot(ID *id)
   if (*len_ptr == 0) {
     BKE_id_material_eval_assign(id, 1, nullptr);
   }
-}
-
-bool BKE_material_use_custom_holdout(Material* ma)
-{
-  if (ma == NULL || ma->blend_method == MA_BM_SOLID) {
-    return false;
-  }
-  return true;
 }
 
 int BKE_object_material_index_get(Object *ob, Material *ma)
@@ -2007,13 +1999,6 @@ static void material_default_surface_init(Material *ma)
   output->locy = 300.0f;
 
   nodeSetActive(ntree, output);
-
-  const uint32_t default_light_groups[4] = {
-      0,0,0,1
-  };
-
-  copy_v4_v4_int(ma->light_group_bits, (int*) default_light_groups);
-  copy_v4_v4_int(ma->light_group_shadow_bits, (int*) default_light_groups);
 }
 
 static void material_default_volume_init(Material *ma)

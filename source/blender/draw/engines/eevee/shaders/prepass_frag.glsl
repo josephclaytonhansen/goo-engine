@@ -91,8 +91,6 @@ void main()
     }
   }
 #endif
-
-  resource_id_out = resource_id;
 }
 
 /* Passthrough. */

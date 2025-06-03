@@ -29,7 +29,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_addon.h"
-#include "BKE_appdir.hh"
+#include "BKE_appdir.h"
 #include "BKE_callbacks.h"
 #include "BKE_sound.h"
 #include "BKE_studiolight.h"
@@ -4868,12 +4868,6 @@ static void rna_def_userdef_view(BlenderRNA *brna)
       prop,
       "UI Line Width",
       "Changes the thickness of widget outlines, lines and dots in the interface");
-  RNA_def_property_update(prop, 0, "rna_userdef_gpu_update");
-
-  prop = RNA_def_property(srna, "viewport_line_width", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_ui_text(
-      prop, "Viewport Line Width", "Changes the appearance of only lines in the 3D viewport");
-  RNA_def_property_range(prop, 1.0f, 3.0f);
   RNA_def_property_update(prop, 0, "rna_userdef_gpu_update");
 
   /* display */

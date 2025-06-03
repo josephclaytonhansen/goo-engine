@@ -338,7 +338,8 @@ static void initBend(TransInfo *t, wmOperator * /*op*/)
 
   t->idx_max = 1;
   t->num.idx_max = 1;
-  initSnapAngleIncrements(t);
+  t->snap[0] = SNAP_INCREMENTAL_ANGLE;
+  t->snap[1] = t->snap[0] * 0.2;
 
   copy_v3_fl(t->num.val_inc, t->snap[0]);
   t->num.unit_sys = t->scene->unit.system;

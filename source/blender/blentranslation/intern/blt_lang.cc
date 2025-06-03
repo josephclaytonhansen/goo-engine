@@ -25,9 +25,9 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_appdir.hh"
+#include "BKE_appdir.h"
 
-#include "IMB_thumbs.hh"
+#include "IMB_thumbs.h"
 
 #include "DNA_userdef_types.h"
 

@@ -661,10 +661,6 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
                        "all",
                        1);
       }
-      uiItemO(layout,
-                     CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Show FCurve in Editor"),
-                     ICON_FCURVE,
-                     "UI_OT_show_fcurve_in_editor");
     }
 
     if (but->flag & UI_BUT_ANIMATED) {
@@ -1002,34 +998,6 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *ev
 
     if (type == PROP_STRING && ELEM(subtype, PROP_FILEPATH, PROP_DIRPATH)) {
       if (ui_but_menu_add_path_operators(layout, ptr, prop)) {
-        uiItemS(layout);
-      }
-    }
-  }
-  else if (but->optype && but->opptr && RNA_struct_property_is_set(but->opptr, "filepath")) {
-    /* Operator with "filepath" string property of PROP_FILEPATH subtype. */
-    PropertyRNA *prop = RNA_struct_find_property(but->opptr, "filepath");
-    const PropertySubType subtype = RNA_property_subtype(prop);
-
-    if (prop && RNA_property_type(prop) == PROP_STRING &&
-        subtype == PropertySubType::PROP_FILEPATH)
-    {
-      char filepath[FILE_MAX] = {0};
-      RNA_property_string_get(but->opptr, prop, filepath);
-      if (filepath[0] && BLI_exists(filepath)) {
-        wmOperatorType *ot = WM_operatortype_find("WM_OT_path_open", true);
-        PointerRNA props_ptr;
-        char dir[FILE_MAXDIR];
-        BLI_path_split_dir_part(filepath, dir, sizeof(dir));
-        uiItemFullO_ptr(layout,
-                        ot,
-                        CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Open File Location"),
-                        ICON_NONE,
-                        nullptr,
-                        WM_OP_INVOKE_DEFAULT,
-                        UI_ITEM_NONE,
-                        &props_ptr);
-        RNA_string_set(&props_ptr, "filepath", dir);
         uiItemS(layout);
       }
     }

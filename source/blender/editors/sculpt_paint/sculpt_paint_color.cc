@@ -22,11 +22,11 @@
 #include "BKE_paint.hh"
 #include "BKE_pbvh_api.hh"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "sculpt_intern.hh"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 #include "bmesh.hh"
 

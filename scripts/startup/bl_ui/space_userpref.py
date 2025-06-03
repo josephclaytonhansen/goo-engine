@@ -208,7 +208,6 @@ class USERPREF_PT_interface_display(InterfacePanel, CenterAlignMixIn, Panel):
 
         col.prop(view, "ui_scale", text="Resolution Scale")
         col.prop(view, "ui_line_width", text="Line Width")
-        col.prop(view, "viewport_line_width", text="Viewport Line Width")
         col.prop(view, "show_splash", text="Splash Screen")
         col.prop(view, "show_developer_ui")
 
@@ -1654,7 +1653,6 @@ class USERPREF_PT_saveload_blend(SaveLoadPanel, CenterAlignMixIn, Panel):
 
         col = layout.column(heading="Text Files")
         col.prop(paths, "use_tabs_as_spaces")
-        col.prop(paths, "save_version_warning")
 
 
 class USERPREF_PT_saveload_file_browser(SaveLoadPanel, CenterAlignMixIn, Panel):

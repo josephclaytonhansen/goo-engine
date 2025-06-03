@@ -1725,12 +1725,6 @@ typedef struct ToolSettings {
   char use_plane_axis_auto;
   char _pad7[2];
 
-  /** Rotation Angle snapping amount */
-  float snap_angle_increment_2d;
-  float snap_angle_increment_2d_precision;
-  float snap_angle_increment_3d;
-  float snap_angle_increment_3d_precision;
-
 } ToolSettings;
 
 /** \} */
@@ -2715,8 +2709,6 @@ typedef enum eGPencil_Flags {
   GP_TOOL_FLAG_CREATE_WEIGHTS = (1 << 4),
   /** Auto-merge with last stroke. */
   GP_TOOL_FLAG_AUTOMERGE_STROKE = (1 << 5),
-  /* Autoclose last stroke */
-  GP_TOOL_FLAG_AUTOCLOSE_STROKE = (1 << 6),
 } eGPencil_Flags;
 
 /** #Scene::r.simplify_gpencil */
@@ -2861,8 +2853,7 @@ enum {
   SCE_EEVEE_DOF_HQ_SLIGHT_FOCUS = (1 << 22),
   SCE_EEVEE_DOF_JITTER = (1 << 23),
   SCE_EEVEE_SHADOW_ENABLED = (1 << 24),
-  SCE_EEVEE_SHADOW_ID_HIGH_BITDEPTH = (1 << 25),
-  SCE_EEVEE_RAYTRACE_OPTIONS_SPLIT = (1 << 26),
+  SCE_EEVEE_RAYTRACE_OPTIONS_SPLIT = (1 << 25),
 };
 
 typedef enum RaytraceEEVEE_Flag {

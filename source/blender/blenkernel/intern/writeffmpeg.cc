@@ -38,7 +38,7 @@
 #  include "BKE_sound.h"
 #  include "BKE_writeffmpeg.hh"
 
-#  include "IMB_imbuf.hh"
+#  include "IMB_imbuf.h"
 
 /* This needs to be included after BLI_math_base.h otherwise it will redefine some math defines
  * like M_SQRT1_2 leading to warnings with MSVC */
@@ -47,7 +47,6 @@ extern "C" {
 #  include <libavformat/avformat.h>
 #  include <libavutil/buffer.h>
 #  include <libavutil/channel_layout.h>
-#  include <libavutil/cpu.h>
 #  include <libavutil/imgutils.h>
 #  include <libavutil/opt.h>
 #  include <libavutil/rational.h>
@@ -239,15 +238,14 @@ static AVFrame *alloc_picture(AVPixelFormat pix_fmt, int width, int height)
   }
 
   /* allocate the actual picture buffer */
-  const size_t align = av_cpu_max_align();
-  int size = av_image_get_buffer_size(pix_fmt, width, height, align);
+  int size = av_image_get_buffer_size(pix_fmt, width, height, 1);
   AVBufferRef *buf = av_buffer_alloc(size);
   if (buf == nullptr) {
     av_frame_free(&f);
     return nullptr;
   }
 
-  av_image_fill_arrays(f->data, f->linesize, buf->data, pix_fmt, width, height, align);
+  av_image_fill_arrays(f->data, f->linesize, buf->data, pix_fmt, width, height, 1);
   f->buf[0] = buf;
   f->format = pix_fmt;
   f->width = width;
@@ -396,16 +394,15 @@ static AVFrame *generate_video_frame(FFMpegContext *context, const uint8_t *pixe
   /* Copy the Blender pixels into the FFMPEG data-structure, taking care of endianness and flipping
    * the image vertically. */
   int linesize = rgb_frame->linesize[0];
-  int linesize_src = rgb_frame->width * 4;
   for (int y = 0; y < height; y++) {
     uint8_t *target = rgb_frame->data[0] + linesize * (height - y - 1);
-    const uint8_t *src = pixels + linesize_src * y;
+    const uint8_t *src = pixels + linesize * y;
 
 #  if ENDIAN_ORDER == L_ENDIAN
-    memcpy(target, src, linesize_src);
+    memcpy(target, src, linesize);
 
 #  elif ENDIAN_ORDER == B_ENDIAN
-    const uint8_t *end = src + linesize_src;
+    const uint8_t *end = src + linesize;
     while (src != end) {
       target[3] = src[0];
       target[2] = src[1];

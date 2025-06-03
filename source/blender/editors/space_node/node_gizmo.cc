@@ -20,7 +20,7 @@
 #include "ED_gizmo_library.hh"
 #include "ED_screen.hh"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "MEM_guardedalloc.h"
 

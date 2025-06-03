@@ -27,7 +27,7 @@
 #include "DEG_depsgraph_build.hh"
 
 /* Only for blend modes. */
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 #include "WM_api.hh"
 #include "WM_types.hh"

@@ -25,10 +25,9 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.hh"
-#include "BKE_fcurve.h"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_override.hh"
@@ -39,7 +38,7 @@
 #include "BKE_screen.hh"
 #include "BKE_text.h"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "DEG_depsgraph.hh"
 
@@ -51,14 +50,12 @@
 #include "RNA_types.hh"
 
 #include "UI_interface.hh"
-#include "UI_abstract_view.hh"
 
 #include "interface_intern.hh"
 
 #include "WM_api.hh"
 #include "WM_types.hh"
 
-#include "ED_anim_api.hh"
 #include "ED_object.hh"
 #include "ED_paint.hh"
 #include "ED_undo.hh"
@@ -262,130 +259,6 @@ static void UI_OT_copy_as_driver_button(wmOperatorType *ot)
 
   /* flags */
   ot->flag = OPTYPE_REGISTER;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Show FCurve in editor Operator
- * \{ */
-
-static bool show_fcurve_in_editor_poll(bContext *C)
-{
-  uiBut *but = UI_context_active_but_get(C);
-
-  if (but) {
-    PointerRNA *ptr = &but->rnapoin;
-    PropertyRNA *prop = but->rnaprop;
-
-    return RNA_property_animated(ptr, prop);
-  }
-
-  return false;
-}
-
-static int show_fcurve_in_editor_exec(bContext *C, wmOperator *op)
-{
-  uiBut *but = UI_context_active_but_get(C);
-
-  /* Find any open FCurve Editor for Operator context */
-  bScreen *screen = CTX_wm_screen(C);
-  ScrArea *graph_area = nullptr;
-  LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-    if (area->spacetype == SPACE_GRAPH) {
-      SpaceGraph *space = (SpaceGraph *)area->spacedata.first;
-      if (space->mode == SIPO_MODE_ANIMATION) {
-        graph_area = area;
-        break;
-      }
-    }
-  }
-
-  if (!graph_area) {
-    BKE_report(op->reports, RPT_ERROR, "No open Graph editors");
-    return OPERATOR_CANCELLED;
-  }
-
-  /* Find the correlated FCurve. */
-  bAction *action;
-  FCurve *fcu_active = BKE_fcurve_find_by_rna(
-      &but->rnapoin, but->rnaprop, but->rnaindex, nullptr, &action, nullptr, nullptr);
-
-  if (!fcu_active) {
-    BKE_report(op->reports, RPT_ERROR, "No FCurve on property");
-    return OPERATOR_CANCELLED;
-  }
-
-  { /* Context override begin */
-    ScrArea *cur_area = CTX_wm_area(C);
-    ARegion *cur_region = CTX_wm_region(C);
-    CTX_wm_area_set(C, graph_area);
-    CTX_wm_region_set(
-        C, BKE_region_find_in_listbase_by_type(&graph_area->regionbase, RGN_TYPE_WINDOW));
-
-    wmOperatorType *ot;
-    PointerRNA ptr;
-
-    /* Select all FCurves. */
-    ot = WM_operatortype_find("GRAPH_OT_select_all", true);
-    BLI_assert(ot);
-    WM_operator_properties_create_ptr(&ptr, ot);
-    RNA_enum_set(&ptr, "action", 1); /* SEL_SELECT */
-    WM_operator_name_call(C, "graph.select_all", WM_OP_EXEC_DEFAULT, &ptr, nullptr);
-    WM_operator_properties_free(&ptr);
-
-    /* Hide all fcurves. */
-    ot = WM_operatortype_find("GRAPH_OT_hide", true);
-    BLI_assert(ot);
-    WM_operator_properties_create_ptr(&ptr, ot);
-    RNA_boolean_set(&ptr, "unselected", false);
-    WM_operator_name_call(C, "graph.hide", WM_OP_EXEC_DEFAULT, &ptr, nullptr);
-    WM_operator_properties_free(&ptr);
-
-    /* Unhide FCurve of selected property path and make it Active. */
-    fcu_active->flag |= FCURVE_VISIBLE | FCURVE_ACTIVE | FCURVE_SELECTED;
-
-    /* Perform zoom-in on FCurve in all FCurve editor regions. */
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      if (area->spacetype == SPACE_GRAPH) {
-        SpaceGraph *space = (SpaceGraph *)area->spacedata.first;
-        if (space->mode == SIPO_MODE_ANIMATION) {
-          CTX_wm_area_set(C, area);
-          CTX_wm_region_set(
-              C, BKE_region_find_in_listbase_by_type(&area->regionbase, RGN_TYPE_WINDOW));
-          /* Focus view on active FCurve. */
-          ot = WM_operatortype_find("GRAPH_OT_view_all", true);
-          BLI_assert(ot);
-          WM_operator_properties_create_ptr(&ptr, ot);
-          /* Use INVOKE_DEFAULT to preserve UI animation. */
-          WM_operator_name_call(C, "graph.view_all", WM_OP_INVOKE_DEFAULT, &ptr, nullptr);
-          WM_operator_properties_free(&ptr);
-        }
-      }
-    }
-
-    CTX_wm_area_set(C, cur_area);
-    CTX_wm_region_set(C, cur_region);
-  } /* Context override end */
-
-  WM_event_add_notifier(C, NC_ANIMATION | ND_SPACE_GRAPH, nullptr);
-
-  return OPERATOR_FINISHED;
-}
-
-static void UI_OT_show_fcurve_in_editor(wmOperatorType *ot)
-{
-  /* identifiers */
-  ot->name = "Show FCurve in Editor";
-  ot->idname = "UI_OT_show_fcurve_in_editor";
-  ot->description = "Select and isolate this animation channel in Curve editors";
-
-  /* callbacks */
-  ot->exec = show_fcurve_in_editor_exec;
-  ot->poll = show_fcurve_in_editor_poll;
-
-  /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 /** \} */
@@ -2537,23 +2410,18 @@ static void UI_OT_list_start_filter(wmOperatorType *ot)
 /** \name UI View Start Filter Operator
  * \{ */
 
-static AbstractView *get_view_focused(bContext *C)
+static bool ui_view_focused_poll(bContext *C)
 {
   const wmWindow *win = CTX_wm_window(C);
   if (!(win && win->eventstate)) {
-    return nullptr;
+    return false;
   }
 
   const ARegion *region = CTX_wm_region(C);
   if (!region) {
-    return nullptr;
+    return false;
   }
-  return reinterpret_cast<AbstractView*>(UI_region_view_find_at(region, win->eventstate->xy, 0));
-}
-
-static bool ui_view_focused_poll(bContext *C)
-{
-  const AbstractView *view = get_view_focused(C);
+  const uiViewHandle *view = UI_region_view_find_at(region, win->eventstate->xy, 0);
   return view != nullptr;
 }
 
@@ -2628,72 +2496,6 @@ static void UI_OT_view_drop(wmOperatorType *ot)
 
   ot->invoke = ui_view_drop_invoke;
   ot->poll = ui_view_drop_poll;
-
-  ot->flag = OPTYPE_INTERNAL;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name UI View Drop Operator
- * \{ */
-
-static bool ui_view_scroll_poll(bContext *C)
-{
-  const AbstractView *view = get_view_focused(C);
-  if (!view) {
-    return false;
-  }
-
-  return view->supports_scrolling();
-}
-
-static int ui_view_scroll_invoke(bContext *C, wmOperator * /*op*/, const wmEvent *event)
-{
-  ARegion *region = CTX_wm_region(C);
-  int type = event->type;
-  bool invert_direction = false;
-
-  if (type == MOUSEPAN) {
-    int dummy_val;
-    ui_pan_to_scroll(event, &type, &dummy_val);
-
-    /* 'ui_pan_to_scroll' gives the absolute direction. */
-    if (event->flag & WM_EVENT_SCROLL_INVERT) {
-      invert_direction = true;
-    }
-  }
-
-  AbstractView *view = get_view_focused(C);
-  std::optional<ViewScrollDirection> direction =
-      [type, invert_direction]() -> std::optional<ViewScrollDirection> {
-    switch (type) {
-      case WHEELUPMOUSE:
-        return invert_direction ? ViewScrollDirection::DOWN : ViewScrollDirection::UP;
-      case WHEELDOWNMOUSE:
-        return invert_direction ? ViewScrollDirection::UP : ViewScrollDirection::DOWN;
-      default:
-        return std::nullopt;
-    }
-  }();
-  if (!direction) {
-    return OPERATOR_CANCELLED;
-  }
-
-  BLI_assert(view->supports_scrolling());
-  view->scroll(*direction);
-
-  ED_region_tag_redraw(region);
-  return OPERATOR_FINISHED;
-}
-
-static void UI_OT_view_scroll(wmOperatorType *ot)
-{
-  ot->name = "View Scroll";
-  ot->idname = "UI_OT_view_scroll";
-
-  ot->invoke = ui_view_scroll_invoke;
-  ot->poll = ui_view_scroll_poll;
 
   ot->flag = OPTYPE_INTERNAL;
 }
@@ -2822,7 +2624,6 @@ void ED_operatortypes_ui()
 {
   WM_operatortype_append(UI_OT_copy_data_path_button);
   WM_operatortype_append(UI_OT_copy_as_driver_button);
-  WM_operatortype_append(UI_OT_show_fcurve_in_editor);
   WM_operatortype_append(UI_OT_copy_python_command_button);
   WM_operatortype_append(UI_OT_reset_default_button);
   WM_operatortype_append(UI_OT_assign_default_button);
@@ -2844,7 +2645,6 @@ void ED_operatortypes_ui()
 
   WM_operatortype_append(UI_OT_view_start_filter);
   WM_operatortype_append(UI_OT_view_drop);
-  WM_operatortype_append(UI_OT_view_scroll);
   WM_operatortype_append(UI_OT_view_item_rename);
 
   WM_operatortype_append(UI_OT_override_type_set_button);

@@ -14,7 +14,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_math_vector_types.hh"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 namespace blender::bke::image {
 

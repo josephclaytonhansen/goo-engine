@@ -21,16 +21,18 @@
 
 #include "DNA_ID.h" /* ID property definitions. */
 
-#include "IMB_colormanagement.hh"
-#include "IMB_filetype.hh"
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_metadata.hh"
-#include "imbuf.hh"
+#include "IMB_filetype.h"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_metadata.h"
+#include "imbuf.h"
 
 #include <cstring>
 #include <jerror.h>
 #include <jpeglib.h>
+
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
 
 /* the types are from the jpeg lib */
 static void jpeg_error(j_common_ptr cinfo) ATTR_NORETURN;
@@ -302,7 +304,7 @@ static ImBuf *ibJpegImageFromCinfo(
 
       for (y = ibuf->y - 1; y >= 0; y--) {
         jpeg_read_scanlines(cinfo, row_pointer, 1);
-        rect = ibuf->byte_buffer.data + 4 * y * size_t(ibuf->x);
+        rect = ibuf->byte_buffer.data + 4 * y * ibuf->x;
         buffer = row_pointer[0];
 
         switch (depth) {
@@ -618,7 +620,7 @@ static void write_jpeg(jpeg_compress_struct *cinfo, ImBuf *ibuf)
       sizeof(JSAMPLE) * cinfo->input_components * cinfo->image_width, "jpeg row_pointer"));
 
   for (y = ibuf->y - 1; y >= 0; y--) {
-    rect = ibuf->byte_buffer.data + 4 * y * size_t(ibuf->x);
+    rect = ibuf->byte_buffer.data + 4 * y * ibuf->x;
     buffer = row_pointer[0];
 
     switch (cinfo->in_color_space) {

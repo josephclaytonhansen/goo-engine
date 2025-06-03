@@ -17,7 +17,7 @@
 
 #include "BKE_collection.h"
 #include "BKE_context.hh"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.hh"
 #include "BKE_main.hh"
@@ -184,17 +184,6 @@ static bool collection_edit_in_active_scene_poll(bContext *C)
   return true;
 }
 
-static bool collection_new_poll(bContext *C)
-{
-  if (!ED_operator_region_outliner_active(C)) {
-    return false;
-  }
-  if (!collection_edit_in_active_scene_poll(C)) {
-    return false;
-  }
-  return true;
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -280,7 +269,7 @@ void OUTLINER_OT_collection_new(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = collection_new_exec;
-  ot->poll = collection_new_poll;
+  ot->poll = collection_edit_in_active_scene_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

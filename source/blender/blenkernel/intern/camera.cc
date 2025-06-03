@@ -32,7 +32,7 @@
 #include "BKE_anim_data.h"
 #include "BKE_camera.h"
 #include "BKE_idprop.h"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_query.hh"
@@ -59,9 +59,6 @@ static void camera_init_data(ID *id)
   BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(cam, id));
 
   MEMCPY_STRUCT_AFTER(cam, DNA_struct_default_get(Camera), id);
-
-  cam->resolution_x = 1920;
-  cam->resolution_y = 1080;
 }
 
 /**

@@ -8,7 +8,7 @@
 
 #include "openexr_api.h"
 
-#include "IMB_openexr.hh"
+#include "IMB_openexr.h"
 
 void *IMB_exr_get_handle()
 {

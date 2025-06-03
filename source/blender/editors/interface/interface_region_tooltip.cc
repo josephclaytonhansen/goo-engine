@@ -45,8 +45,8 @@
 #include "GPU_immediate_util.h"
 #include "GPU_state.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "WM_api.hh"
 #include "WM_types.hh"
@@ -1459,10 +1459,6 @@ ARegion *UI_tooltip_create_from_button_or_extra_icon(
       overlap_rect_fl = but->rect;
     }
     BLI_rcti_rctf_copy_round(&init_rect, &overlap_rect_fl);
-  }
-  else if (but->type == UI_BTYPE_LABEL && BLI_rctf_size_y(&but->rect) > UI_UNIT_Y) {
-    init_position[0] = win->eventstate->xy[0];
-    init_position[1] = win->eventstate->xy[1] - (UI_POPUP_MARGIN / 2);
   }
   else {
     init_position[0] = BLI_rctf_cent_x(&but->rect);

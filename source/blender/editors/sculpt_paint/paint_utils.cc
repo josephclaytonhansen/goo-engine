@@ -18,7 +18,6 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math_color.h"
-#include "BLI_math_matrix.h"
 #include "BLI_rect.h"
 #include "BLI_utildefines.h"
 
@@ -49,8 +48,9 @@
 #include "GPU_state.h"
 #include "GPU_texture.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "RE_texture.h"
 

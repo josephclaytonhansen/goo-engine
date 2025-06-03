@@ -2455,8 +2455,6 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
        0,
        "Screen Space",
        "Set stroke thickness relative to the screen space"},
-       {GP_DATA_STROKE_VIEW_INDEPENDENT_THICKNESS,
-        "WORLDSPACE_NO_PERSPECTIVE", 0, "Fixed Scale World Space", "Set stroke thickness relative to world, but ignore perspective"},
       {0, nullptr, 0, nullptr, nullptr},
   };
 

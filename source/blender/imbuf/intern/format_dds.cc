@@ -15,8 +15,8 @@
 
 #include "oiio/openimageio_support.hh"
 
-#include "IMB_filetype.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_filetype.h"
+#include "IMB_imbuf_types.h"
 
 #include "BLI_path_util.h"
 #include "BLI_string.h"

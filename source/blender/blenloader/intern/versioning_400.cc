@@ -39,12 +39,10 @@
 #include "BLI_assert.h"
 #include "BLI_listbase.h"
 #include "BLI_map.hh"
-#include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_set.hh"
 #include "BLI_string.h"
 #include "BLI_string_ref.hh"
-#include "BLI_math_rotation.h"
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
@@ -447,55 +445,6 @@ void do_versions_after_linking_400(FileData *fd, Main *bmain)
       LISTBASE_FOREACH (Object *, object, &bmain->objects) {
         versioning_eevee_shadow_settings(object);
       }
-    }
-  }
-
-  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 402, 45)) {
-    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
-      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-          if (sl->spacetype == SPACE_VIEW3D) {
-            View3D *v3d = reinterpret_cast<View3D *>(sl);
-            v3d->flag2 |= V3D_SHOW_CAMERA_GUIDES;
-          }
-        }
-      }
-    }
-  }
-
-  if (MAIN_VERSION_FILE_ATLEAST(bmain, 402, 0)) {
-    /* These matrices are runtime data and in 4.2 they are not contained in DNA. For those files
-     * from future versions, initialize the matrices to the identity so they are valid before a
-     * depsgraph update. */
-    LISTBASE_FOREACH (Object *, object, &bmain->objects) {
-      unit_m4(object->object_to_world);
-      unit_m4(object->world_to_object);
-    }
-  }
-
-  if (!MAIN_VERSION_FILE_ATLEAST(bmain, 402, 9)) {
-    const float default_snap_angle_increment = DEG2RADF(15.0f);
-    const float default_snap_angle_increment_precision = DEG2RADF(5.0f);
-    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-      scene->toolsettings->snap_angle_increment_2d = default_snap_angle_increment;
-      scene->toolsettings->snap_angle_increment_3d = default_snap_angle_increment;
-      scene->toolsettings->snap_angle_increment_2d_precision =
-          default_snap_angle_increment_precision;
-      scene->toolsettings->snap_angle_increment_3d_precision =
-          default_snap_angle_increment_precision;
-    }
-  }
-
-    if (!MAIN_VERSION_FILE_ATLEAST(bmain, 402, 9)) {
-    const float default_snap_angle_increment = DEG2RADF(15.0f);
-    const float default_snap_angle_increment_precision = DEG2RADF(5.0f);
-    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-      scene->toolsettings->snap_angle_increment_2d = default_snap_angle_increment;
-      scene->toolsettings->snap_angle_increment_3d = default_snap_angle_increment;
-      scene->toolsettings->snap_angle_increment_2d_precision =
-          default_snap_angle_increment_precision;
-      scene->toolsettings->snap_angle_increment_3d_precision =
-          default_snap_angle_increment_precision;
     }
   }
 

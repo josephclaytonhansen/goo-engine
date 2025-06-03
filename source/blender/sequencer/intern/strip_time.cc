@@ -24,7 +24,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_sound_types.h"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 #include "RNA_prototypes.h"
 

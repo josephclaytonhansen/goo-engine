@@ -18,13 +18,13 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_moviecache.hh"
+#include "IMB_imbuf.h"
+#include "IMB_moviecache.h"
 
 #include "BKE_addon.h"
-#include "BKE_blender.h"            /* own include */
-#include "BKE_blender_user_menu.hh" /* own include */
-#include "BKE_blender_version.h"    /* own include */
+#include "BKE_blender.h" /* own include */
+#include "BKE_blender_user_menu.h"
+#include "BKE_blender_version.h" /* own include */
 #include "BKE_blendfile.hh"
 #include "BKE_brush.hh"
 #include "BKE_cachefile.h"
@@ -114,8 +114,6 @@ static void blender_version_init()
   else {
     BLI_assert_msg(0, "Invalid Blender version cycle");
   }
-
-  version_cycle = " Fruitbat";
 
   SNPRINTF(blender_version_string,
            "%d.%01d.%d%s",

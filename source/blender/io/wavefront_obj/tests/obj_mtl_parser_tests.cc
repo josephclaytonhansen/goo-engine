@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "BKE_appdir.hh"
+#include "BKE_appdir.h"
 
 #include "testing/testing.h"
 

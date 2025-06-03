@@ -63,7 +63,7 @@
 #include "BKE_multires.hh"
 #include "BKE_node.hh"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 #include "MEM_guardedalloc.h"
 
 #include "RNA_access.hh"

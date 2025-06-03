@@ -49,7 +49,7 @@
 #include "BLI_vector_set.hh"
 #include "BLT_translation.h"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
@@ -61,7 +61,7 @@
 #include "BKE_global.h"
 #include "BKE_idprop.h"
 #include "BKE_idprop.hh"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_image_format.h"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_query.hh"
@@ -1376,7 +1376,7 @@ static blender::Set<int> get_known_node_types_set()
 static bool can_read_node_type(const int type)
 {
   /* Can always read custom node types. */
-  if (ELEM(type, NODE_CUSTOM, NODE_CUSTOM_GROUP)) {
+  if (type == NODE_CUSTOM) {
     return true;
   }
 

@@ -31,7 +31,7 @@
 
 #include "RE_pipeline.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "eevee_private.h"
 

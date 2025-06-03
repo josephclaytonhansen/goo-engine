@@ -79,10 +79,7 @@ typedef struct Light {
   float shadow_trace_distance;
   float _pad3;
 
-  /* Goo-engine */
-  int light_group_bits[4];
-
-  /* preview */
+  /* Preview */
   struct PreviewImage *preview;
 
   /* Nodes */
@@ -105,8 +102,6 @@ enum {
    */
   LA_DS_SHOW_TEXS = 1 << 2,
 };
-
-#define LA_GROUPS_ALL 0xFFFFFFFF
 
 /** #Light::type */
 enum {

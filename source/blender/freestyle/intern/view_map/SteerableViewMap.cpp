@@ -23,8 +23,8 @@
 
 #include "BKE_global.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 namespace Freestyle {
 

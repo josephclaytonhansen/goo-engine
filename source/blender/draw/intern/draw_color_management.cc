@@ -20,6 +20,8 @@
 
 #include "BKE_colortools.hh"
 
+#include "IMB_colormanagement.h"
+
 #include "draw_color_management.h"
 
 namespace blender::draw::color_management {

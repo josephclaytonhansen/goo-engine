@@ -18,7 +18,6 @@
 #include "interface_intern.hh"
 
 #include "UI_interface.hh"
-#include "UI_view2d.hh"
 
 #include "WM_api.hh"
 #include "WM_types.hh"
@@ -114,118 +113,67 @@ AbstractTreeViewItem *AbstractTreeView::find_hovered(const ARegion &region, cons
   return hovered_item;
 }
 
-void AbstractTreeView::set_default_rows(int default_rows)
+void AbstractTreeView::set_min_rows(int min_rows)
 {
-  custom_height_ = std::make_unique<int>(default_rows * padded_item_height());
+  min_rows_ = min_rows;
 }
 
-int AbstractTreeView::count_visible_descendants(const AbstractTreeViewItem &parent) const
+AbstractTreeViewItem *AbstractTreeView::find_last_visible_descendant(
+    const AbstractTreeViewItem &parent) const
 {
   if (parent.is_collapsed()) {
-    return 0;
-  }
-  int count = 0;
-  for (const auto &item : parent.children_) {
-    if (!item->is_filtered_visible()) {
-      continue;
-    }
-    count++;
-    count += count_visible_descendants(*item);
+    return nullptr;
   }
 
-  return count;
+  AbstractTreeViewItem *last_descendant = parent.children_.last().get();
+  while (!last_descendant->children_.is_empty() && !last_descendant->is_collapsed()) {
+    last_descendant = last_descendant->children_.last().get();
+  }
+
+  return last_descendant;
 }
 
-void AbstractTreeView::get_hierarchy_lines(const ARegion &region,
-                                           const TreeViewOrItem &parent,
-                                           const float aspect,
-                                           Vector<std::pair<int2, int2>> &lines,
-                                           int &visible_item_index) const
+void AbstractTreeView::draw_hierarchy_lines_recursive(const ARegion &region,
+                                                      const TreeViewOrItem &parent,
+                                                      const uint pos) const
 {
-  const int scroll_ofs = scroll_value_ ? *scroll_value_ : 0;
-  const int max_visible_row_count = tot_visible_row_count().value_or(
-      std::numeric_limits<int>::max());
-
   for (const auto &item : parent.children_) {
-    if (!item->is_filtered_visible()) {
-      continue;
-    }
-
-    const int item_index = visible_item_index;
-    visible_item_index++;
-
     if (!item->is_collapsible() || item->is_collapsed()) {
       continue;
     }
 
-    /* Draw a hierarchy line for the descendants of this item. */
+    draw_hierarchy_lines_recursive(region, *item, pos);
 
     const AbstractTreeViewItem *first_descendant = item->children_.first().get();
-    const int descendant_count = count_visible_descendants(*item);
-
-    const int first_descendant_index = item_index + 1;
-    const int last_descendant_index = first_descendant_index + descendant_count;
-
+    const AbstractTreeViewItem *last_descendant = find_last_visible_descendant(*item);
+    if (!first_descendant->view_item_but_ || !last_descendant || !last_descendant->view_item_but_)
     {
-      const bool line_ends_above_visible = last_descendant_index < scroll_ofs;
-      if (line_ends_above_visible) {
-        continue;
-      }
-
-      const bool line_starts_below_visible = first_descendant_index >
-                                             (scroll_ofs + long(max_visible_row_count));
-      /* Can return here even, following items won't be in view anymore. */
-      if (line_starts_below_visible) {
-        return;
-      }
+      return;
     }
+    const uiButViewItem &first_child_but = *first_descendant->view_item_button();
+    const uiButViewItem &last_child_but = *last_descendant->view_item_button();
 
-    const int x = ((first_descendant->indent_width() + (5 * UI_SCALE_FAC) -
-                    (0.5f * UI_ICON_SIZE) + U.pixelsize + UI_SCALE_FAC) /
-                   aspect);
-    const int ymax = std::max(0, first_descendant_index - scroll_ofs) * padded_item_height();
-    const int ymin = std::min(max_visible_row_count, last_descendant_index - scroll_ofs) *
-                     padded_item_height();
-    lines.append(std::make_pair(int2(x, ymax), int2(x, ymin)));
+    BLI_assert(first_child_but.block == last_child_but.block);
+    const uiBlock *block = first_child_but.block;
 
-    this->get_hierarchy_lines(region, *item, aspect, lines, visible_item_index);
+    rcti first_child_rect;
+    ui_but_to_pixelrect(&first_child_rect, &region, block, &first_child_but);
+    rcti last_child_rect;
+    ui_but_to_pixelrect(&last_child_rect, &region, block, &last_child_but);
+
+    /* Small vertical padding. */
+    const short line_padding = UI_UNIT_Y / 4.0f;
+    const float x = first_child_rect.xmin + first_descendant->indent_width() -
+                    UI_ICON_SIZE * 0.5f + 2 * UI_SCALE_FAC;
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex2f(pos, x, first_child_rect.ymax - line_padding);
+    immVertex2f(pos, x, last_child_rect.ymin + line_padding);
+    immEnd();
   }
 }
 
-static uiButViewItem *find_first_view_item_but(const uiBlock &block, const AbstractTreeView &view)
+void AbstractTreeView::draw_hierarchy_lines(const ARegion &region) const
 {
-  LISTBASE_FOREACH (uiBut *, but, &block.buttons) {
-    if (but->type != UI_BTYPE_VIEW_ITEM) {
-      continue;
-    }
-    uiButViewItem *view_item_but = static_cast<uiButViewItem *>(but);
-    AbstractViewItem *view_item = reinterpret_cast<AbstractViewItem *>(view_item_but->view_item);
-    if (&view_item->get_view() == &view) {
-      return view_item_but;
-    }
-  }
-  return nullptr;
-}
-
-void AbstractTreeView::draw_hierarchy_lines(const ARegion &region, const uiBlock &block) const
-{
-  const float aspect = (region.v2d.flag & V2D_IS_INIT) ?
-                           BLI_rctf_size_y(&region.v2d.cur) /
-                               (BLI_rcti_size_y(&region.v2d.mask) + 1) :
-                           1.0f;
-
-  uiButViewItem *first_item_but = find_first_view_item_but(block, *this);
-  if (!first_item_but) {
-    return;
-  }
-
-  Vector<std::pair<int2, int2>> lines;
-  int index = 0;
-  get_hierarchy_lines(region, *this, aspect, lines, index);
-  if (lines.is_empty()) {
-    return;
-  }
-
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   uchar col[4];
@@ -245,34 +193,22 @@ void AbstractTreeView::draw_hierarchy_lines(const ARegion &region, const uiBlock
 
   GPU_line_width(1.0f);
   GPU_blend(GPU_BLEND_ALPHA);
-
-  rcti first_item_but_pixel_rect;
-  ui_but_to_pixelrect(&first_item_but_pixel_rect, &region, &block, first_item_but);
-  int2 top_left{first_item_but_pixel_rect.xmin, first_item_but_pixel_rect.ymax};
-
-  for (const auto &line : lines) {
-    immBegin(GPU_PRIM_LINES, 2);
-    immVertex2f(pos, top_left.x + line.first.x, top_left.y - line.first.y);
-    immVertex2f(pos, top_left.x + line.second.x, top_left.y - line.second.y);
-    immEnd();
-  }
+  draw_hierarchy_lines_recursive(region, *this, pos);
   GPU_blend(GPU_BLEND_NONE);
 
   immUnbindProgram();
 }
 
-void AbstractTreeView::draw_overlays(const ARegion &region, const uiBlock &block) const
+void AbstractTreeView::draw_overlays(const ARegion &region) const
 {
-  draw_hierarchy_lines(region, block);
+  draw_hierarchy_lines(region);
 }
 
 void AbstractTreeView::update_children_from_old(const AbstractView &old_view)
 {
   const AbstractTreeView &old_tree_view = dynamic_cast<const AbstractTreeView &>(old_view);
 
-  custom_height_ = old_tree_view.custom_height_;
-  scroll_value_ = old_tree_view.scroll_value_;
-  this->update_children_from_old_recursive(*this, old_tree_view);
+  update_children_from_old_recursive(*this, old_tree_view);
 }
 
 void AbstractTreeView::update_children_from_old_recursive(const TreeViewOrItem &new_items,
@@ -302,31 +238,6 @@ AbstractTreeViewItem *AbstractTreeView::find_matching_child(
   }
 
   return nullptr;
-}
-
-std::optional<int> AbstractTreeView::tot_visible_row_count() const
-{
-  if (!custom_height_) {
-    return {};
-  }
-  if (*custom_height_ < UI_UNIT_Y) {
-    return 1;
-  }
-  return round_fl_to_int(float(*custom_height_) / padded_item_height());
-}
-
-bool AbstractTreeView::supports_scrolling() const
-{
-  return custom_height_ && scroll_value_;
-}
-
-void AbstractTreeView::scroll(ViewScrollDirection direction)
-{
-  if (!supports_scrolling()) {
-    return;
-  }
-  /* Scroll value will be sanitized/clamped when drawing. */
-  *scroll_value_ += ((direction == ViewScrollDirection::UP) ? -1 : 1);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -395,20 +306,8 @@ void AbstractTreeViewItem::tree_row_click_fn(bContext *C, void *but_arg1, void *
 void AbstractTreeViewItem::add_treerow_button(uiBlock &block)
 {
   /* For some reason a width > (UI_UNIT_X * 2) make the layout system use all available width. */
-  view_item_but_ = reinterpret_cast<uiButViewItem *>(uiDefBut(&block,
-                                                              UI_BTYPE_VIEW_ITEM,
-                                                              0,
-                                                              "",
-                                                              0,
-                                                              0,
-                                                              UI_UNIT_X * 10,
-                                                              padded_item_height(),
-                                                              nullptr,
-                                                              0,
-                                                              0,
-                                                              0,
-                                                              0,
-                                                              ""));
+  view_item_but_ = (uiButViewItem *)uiDefBut(
+      &block, UI_BTYPE_VIEW_ITEM, 0, "", 0, 0, UI_UNIT_X * 10, UI_UNIT_Y, nullptr, 0, 0, 0, 0, "");
 
   view_item_but_->view_item = reinterpret_cast<uiViewItemHandle *>(this);
   view_item_but_->draw_height = unpadded_item_height();
@@ -660,7 +559,7 @@ class TreeViewLayoutBuilder {
   friend TreeViewBuilder;
 
  public:
-  void build_from_tree(AbstractTreeView &tree_view);
+  void build_from_tree(const AbstractTreeView &tree_view);
   void build_row(AbstractTreeViewItem &item) const;
 
   uiBlock &block() const;
@@ -675,99 +574,18 @@ TreeViewLayoutBuilder::TreeViewLayoutBuilder(uiLayout &layout) : block_(*uiLayou
 {
 }
 
-static int count_visible_items(AbstractTreeView &tree_view)
-{
-  int item_count = 0;
-  tree_view.foreach_item([&](AbstractTreeViewItem &) { item_count++; },
-                         AbstractTreeView::IterOptions::SkipCollapsed |
-                             AbstractTreeView::IterOptions::SkipFiltered);
-  return item_count;
-}
-
-void TreeViewLayoutBuilder::build_from_tree(AbstractTreeView &tree_view)
+void TreeViewLayoutBuilder::build_from_tree(const AbstractTreeView &tree_view)
 {
   uiLayout &parent_layout = current_layout();
-  uiBlock *block = uiLayoutGetBlock(&parent_layout);
 
-  uiLayout *col = nullptr;
-  if (true) {
-    uiLayout *box = uiLayoutBox(&parent_layout);
-    col = uiLayoutColumn(box, true);
-  }
-  else {
-    col = uiLayoutColumn(&parent_layout, true);
-  }
-  /* Row for the tree-view and the scroll bar. */
-  uiLayout *row = uiLayoutRow(col, false);
+  uiLayout *box = uiLayoutBox(&parent_layout);
+  uiLayoutColumn(box, true);
 
-  const std::optional<int> visible_row_count = tree_view.tot_visible_row_count();
-  const int tot_items = count_visible_items(tree_view);
+  tree_view.foreach_item([this](AbstractTreeViewItem &item) { build_row(item); },
+                         AbstractTreeView::IterOptions::SkipCollapsed |
+                             AbstractTreeView::IterOptions::SkipFiltered);
 
-  /* Column for the tree view. */
-  uiLayoutColumn(row, true);
-
-  /* Clamp scroll-value to valid range. */
-  if (tree_view.scroll_value_ && visible_row_count) {
-    *tree_view.scroll_value_ = std::clamp(
-        *tree_view.scroll_value_, 0, tot_items - *visible_row_count);
-  }
-
-  const int first_visible_index = tree_view.scroll_value_ ? *tree_view.scroll_value_ : 0;
-  const int max_visible_index = visible_row_count ? first_visible_index + *visible_row_count - 1 :
-                                                    std::numeric_limits<int>::max();
-  int index = 0;
-  tree_view.foreach_item(
-      [&, this](AbstractTreeViewItem &item) {
-        if ((index >= first_visible_index) && (index <= max_visible_index)) {
-          this->build_row(item);
-        }
-        index++;
-      },
-      AbstractTreeView::IterOptions::SkipCollapsed | AbstractTreeView::IterOptions::SkipFiltered);
-
-  if (tree_view.custom_height_) {
-    uiLayoutColumn(row, false);
-
-    *tree_view.custom_height_ = visible_row_count.value_or(1) * padded_item_height();
-    if (!tree_view.scroll_value_) {
-      tree_view.scroll_value_ = std::make_unique<int>(0);
-    }
-
-    if (visible_row_count && (tot_items > *visible_row_count)) {
-      uiDefButI(block,
-                             UI_BTYPE_SCROLL,
-                             0,
-                             "",
-                             0,
-                             0,
-                             V2D_SCROLL_WIDTH,
-                             *tree_view.custom_height_,
-                             tree_view.scroll_value_.get(),
-                             0,
-                             tot_items - *visible_row_count,
-                             *visible_row_count,
-                             0.0,
-                             "");
-    }
-
-    UI_block_layout_set_current(block, col);
-    uiDefIconButI(block,
-                  UI_BTYPE_GRIP,
-                  0,
-                  ICON_GRIP,
-                  0,
-                  0,
-                  UI_UNIT_X * 10,
-                  UI_UNIT_Y * 0.5f,
-                  tree_view.custom_height_.get(),
-                  0,
-                  0,
-                  0,
-                  0,
-                  "");
-  }
-
-  UI_block_layout_set_current(block, &parent_layout);
+  UI_block_layout_set_current(&block(), &parent_layout);
 }
 
 void TreeViewLayoutBuilder::build_row(AbstractTreeViewItem &item) const
@@ -782,6 +600,8 @@ void TreeViewLayoutBuilder::build_row(AbstractTreeViewItem &item) const
   if (!item.is_interactive_) {
     uiLayoutSetActive(overlap, false);
   }
+  /* Scale the layout for the padded height. Widgets will be vertically centered then. */
+  uiLayoutSetScaleY(overlap, float(padded_item_height()) / UI_UNIT_Y);
 
   uiLayout *row = uiLayoutRow(overlap, false);
   /* Enable emboss for mouse hover highlight. */
@@ -790,15 +610,9 @@ void TreeViewLayoutBuilder::build_row(AbstractTreeViewItem &item) const
   item.add_treerow_button(block_);
 
   /* After adding tree-row button (would disable hover highlighting). */
-  UI_block_emboss_set(&block_, UI_EMBOSS_NONE_OR_STATUS);
+  UI_block_emboss_set(&block_, UI_EMBOSS_NONE);
 
-  /* Add little margin to align actual contents vertically. */
-  uiLayout *content_col = uiLayoutColumn(overlap, true);
-  const int margin_top = (padded_item_height() - unpadded_item_height()) / 2;
-  if (margin_top > 0) {
-    uiDefBut(&block_, UI_BTYPE_LABEL, 0, "", 0, 0, UI_UNIT_X, margin_top, nullptr, 0, 0, 0, 0, "");
-  }
-  row = uiLayoutRow(content_col, true);
+  row = uiLayoutRow(overlap, true);
   item.add_indent(*row);
   item.add_collapse_chevron(block_);
 
@@ -827,21 +641,16 @@ uiLayout &TreeViewLayoutBuilder::current_layout() const
 
 void TreeViewBuilder::ensure_min_rows_items(AbstractTreeView &tree_view)
 {
-  const std::optional<int> visible_rows = tree_view.tot_visible_row_count();
-  if (!visible_rows) {
-    return;
-  }
-
   int tot_visible_items = 0;
   tree_view.foreach_item(
       [&tot_visible_items](AbstractTreeViewItem & /*item*/) { tot_visible_items++; },
       AbstractTreeView::IterOptions::SkipCollapsed | AbstractTreeView::IterOptions::SkipFiltered);
 
-  if (tot_visible_items >= *visible_rows) {
+  if (tot_visible_items >= tree_view.min_rows_) {
     return;
   }
 
-  for (int i = 0; i < (*visible_rows - tot_visible_items); i++) {
+  for (int i = 0; i < (tree_view.min_rows_ - tot_visible_items); i++) {
     BasicTreeViewItem &new_item = tree_view.add_tree_item<BasicTreeViewItem>("");
     new_item.disable_interaction();
   }

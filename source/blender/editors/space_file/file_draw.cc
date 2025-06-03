@@ -38,10 +38,10 @@
 
 #include "BLF_api.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_metadata.hh"
-#include "IMB_thumbs.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_metadata.h"
+#include "IMB_thumbs.h"
 
 #include "DNA_userdef_types.h"
 #include "DNA_windowmanager_types.h"
@@ -283,7 +283,7 @@ static void file_draw_tooltip_custom_func(bContext * /*C*/, uiTooltipData *tip, 
                                           day_string,
                                           (is_today || is_yesterday) ? "" : date_st,
                                           (is_today || is_yesterday) ? time_st : ""),
-                              {},
+                              nullptr,
                               UI_TIP_STYLE_NORMAL,
                               UI_TIP_LC_NORMAL);
 
@@ -291,7 +291,7 @@ static void file_draw_tooltip_custom_func(bContext * /*C*/, uiTooltipData *tip, 
       char size[16];
       BLI_filelist_entry_size_to_string(nullptr, file->size, false, size);
       if (file->size < 10000) {
-        char size_full[BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+        char size_full[16];
         BLI_str_format_uint64_grouped(size_full, file->size);
         UI_tooltip_text_field_add(
             tip,

@@ -9,8 +9,6 @@
 #include <cstddef>
 #include <cstdio>
 
-#include <fmt/format.h>
-
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
@@ -34,7 +32,7 @@
 #include "BKE_context.hh"
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_lib_id.hh"
 #include "BKE_nla.h"
 #include "BKE_report.h"
@@ -305,9 +303,9 @@ static blender::Vector<std::string> construct_rna_paths(PointerRNA *ptr)
   if (insert_channel_flags & USER_ANIM_KEY_CHANNEL_CUSTOM_PROPERTIES) {
     if (properties) {
       LISTBASE_FOREACH (IDProperty *, prop, &properties->data.group) {
-        char name_escaped[MAX_IDPROP_NAME * 2];
-        BLI_str_escape(name_escaped, prop->name, sizeof(name_escaped));
-        paths.append(fmt::format("[\"{}\"]", name_escaped));
+        std::string name = prop->name;
+        std::string rna_path = "[\"" + name + "\"]";
+        paths.append(rna_path);
       }
     }
   }

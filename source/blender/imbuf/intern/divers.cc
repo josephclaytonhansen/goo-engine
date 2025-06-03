@@ -9,13 +9,13 @@
 #include "BLI_rect.h"
 #include "BLI_utildefines.h"
 
-#include "IMB_filter.hh"
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "imbuf.hh"
+#include "IMB_filter.h"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "imbuf.h"
 
-#include "IMB_colormanagement.hh"
-#include "IMB_colormanagement_intern.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -844,10 +844,8 @@ void IMB_color_to_bw(ImBuf *ibuf)
   size_t i;
 
   if (rct_fl) {
-    if (ibuf->channels >= 3) {
-      for (i = IMB_get_rect_len(ibuf); i > 0; i--, rct_fl += ibuf->channels) {
-        rct_fl[0] = rct_fl[1] = rct_fl[2] = IMB_colormanagement_get_luminance(rct_fl);
-      }
+    for (i = IMB_get_rect_len(ibuf); i > 0; i--, rct_fl += 4) {
+      rct_fl[0] = rct_fl[1] = rct_fl[2] = IMB_colormanagement_get_luminance(rct_fl);
     }
   }
 
@@ -882,11 +880,9 @@ void IMB_saturation(ImBuf *ibuf, float sat)
   }
 
   if (rct_fl) {
-    if (ibuf->channels >= 3) {
-      for (i = IMB_get_rect_len(ibuf); i > 0; i--, rct_fl += ibuf->channels) {
-        rgb_to_hsv_v(rct_fl, hsv);
-        hsv_to_rgb(hsv[0], hsv[1] * sat, hsv[2], rct_fl, rct_fl + 1, rct_fl + 2);
-      }
+    for (i = IMB_get_rect_len(ibuf); i > 0; i--, rct_fl += 4) {
+      rgb_to_hsv_v(rct_fl, hsv);
+      hsv_to_rgb(hsv[0], hsv[1] * sat, hsv[2], rct_fl, rct_fl + 1, rct_fl + 2);
     }
   }
 }

@@ -7,7 +7,7 @@
 #include "BLI_listbase.h"
 #include "COM_MultiThreadedOperation.h"
 #include "DNA_mask_types.h"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 /* Forward declarations. */
 struct MaskRasterHandle;

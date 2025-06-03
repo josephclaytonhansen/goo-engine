@@ -42,7 +42,7 @@
 #  include "BPY_extern.h"
 #endif
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "RE_bake.h"
 #include "RE_engine.h"

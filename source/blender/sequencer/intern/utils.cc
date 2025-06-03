@@ -38,8 +38,8 @@
 #include "SEQ_time.hh"
 #include "SEQ_utils.hh"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "multiview.hh"
 #include "proxy.hh"
@@ -243,7 +243,7 @@ void seq_open_anim_file(Scene *scene, Sequence *seq, bool openfile)
     else {
       STRNCPY(dirpath, seq->strip->proxy->dirpath);
     }
-    BLI_path_abs(dirpath, ID_BLEND_PATH_FROM_GLOBAL(&scene->id));
+    BLI_path_abs(dirpath, BKE_main_blendfile_path_from_global());
   }
 
   if (is_multiview && seq->views_format == R_IMF_VIEWS_INDIVIDUAL) {

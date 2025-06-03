@@ -7,7 +7,7 @@
 #include "BLI_color.hh"
 #include "BLI_math_matrix.hh"
 #include "BLI_math_quaternion_types.hh"
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 namespace blender::imbuf::tests {
 

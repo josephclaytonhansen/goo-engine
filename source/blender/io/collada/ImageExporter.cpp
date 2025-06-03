@@ -23,7 +23,7 @@
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "ImageExporter.h"
 #include "MaterialExporter.h"

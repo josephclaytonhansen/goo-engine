@@ -23,19 +23,18 @@
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_imbuf_types.h"
 
 #include "BLI_listbase.h"
-#include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
-#include "BLI_math_vector.h"
 #include "BLI_string_utf8_symbols.h"
 
 #include "BLT_translation.h"
 
 #include "BKE_armature.hh"
 #include "BKE_editmesh.hh"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_paint.hh"
 #include "BKE_volume.hh"
 
@@ -68,8 +67,6 @@
 #include "BLI_threads.h"
 
 #include "DEG_depsgraph.hh"
-
-#include "DNA_camera_types.h"
 
 #ifdef WITH_OPENEXR
 const EnumPropertyItem rna_enum_exr_codec_items[] = {
@@ -2402,17 +2399,6 @@ static void rna_SceneCamera_update(Main * /*bmain*/, Scene * /*scene*/, PointerR
 
   if (camera && (camera->type == OB_CAMERA)) {
     DEG_id_tag_update(&camera->id, ID_RECALC_GEOMETRY);
-    Object *camera = scene->camera;
-    if (camera && camera->type == OB_CAMERA && camera->data) {
-      Camera *cam = (Camera *)camera->data;
-      if (cam->resolution_x > 0 && cam->resolution_y > 0) {
-        scene->r.xsch = cam->resolution_x;
-        scene->r.ysch = cam->resolution_y;
-      }
-      WM_main_add_notifier(NC_SCENE | ND_RENDER_OPTIONS, scene);
-      WM_main_add_notifier(NC_SCENE, scene);
-      DEG_id_tag_update(&scene->id, ID_RECALC_COPY_ON_WRITE);
-    }
   }
 }
 
@@ -3469,40 +3455,6 @@ static void rna_def_tool_settings(BlenderRNA *brna)
       "Absolute grid alignment while translating (based on the pivot center)");
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr); /* header redraw */
 
-    prop = RNA_def_property(srna, "snap_angle_increment_2d", PROP_FLOAT, PROP_ANGLE);
-  RNA_def_property_float_sdna(prop, nullptr, "snap_angle_increment_2d");
-  RNA_def_property_ui_text(
-      prop, "Rotation Increment", "Angle used for rotation increments in 2D editors");
-  RNA_def_property_range(prop, 0, DEG2RADF(180.0f));
-  RNA_def_property_ui_range(prop, DEG2RADF(1.0f), DEG2RADF(180.0f), 100.0f, 2);
-  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr); /* header redraw */
-
-  prop = RNA_def_property(srna, "snap_angle_increment_2d_precision", PROP_FLOAT, PROP_ANGLE);
-  RNA_def_property_float_sdna(prop, nullptr, "snap_angle_increment_2d_precision");
-  RNA_def_property_ui_text(prop,
-                           "Rotation Precision Increment",
-                           "Precision Angle used for rotation increments in 2D editors");
-  RNA_def_property_range(prop, 0, DEG2RADF(180.0f));
-  RNA_def_property_ui_range(prop, DEG2RADF(0.1f), DEG2RADF(180.0f), 10.0f, 3);
-  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr); /* header redraw */
-
-  prop = RNA_def_property(srna, "snap_angle_increment_3d", PROP_FLOAT, PROP_ANGLE);
-  RNA_def_property_float_sdna(prop, nullptr, "snap_angle_increment_3d");
-  RNA_def_property_ui_text(
-      prop, "Rotation Increment", "Angle used for rotation increments in 3D editors");
-  RNA_def_property_range(prop, 0, DEG2RADF(180.0f));
-  RNA_def_property_ui_range(prop, DEG2RADF(1.0f), DEG2RADF(180.0f), 100.0f, 2);
-  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr); /* header redraw */
-
-  prop = RNA_def_property(srna, "snap_angle_increment_3d_precision", PROP_FLOAT, PROP_ANGLE);
-  RNA_def_property_float_sdna(prop, nullptr, "snap_angle_increment_3d_precision");
-  RNA_def_property_ui_text(prop,
-                           "Rotation Precision Increment",
-                           "Precision Angle used for rotation increments in 3D editors");
-  RNA_def_property_range(prop, 0, DEG2RADF(180.0f));
-  RNA_def_property_ui_range(prop, DEG2RADF(0.1f), DEG2RADF(180.0f), 10.0f, 3);
-  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr); /* header redraw */
-
   prop = RNA_def_property(srna, "snap_elements", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_bitflag_sdna(prop, nullptr, "snap_mode");
   RNA_def_property_enum_items(prop, rna_enum_snap_element_items);
@@ -3730,17 +3682,6 @@ static void rna_def_tool_settings(BlenderRNA *brna)
       "Join by distance last drawn stroke with previous strokes in the active layer");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, nullptr);
-
-  prop = RNA_def_property(srna, "use_gpencil_autoclose_strokes", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "gpencil_flags", GP_TOOL_FLAG_AUTOCLOSE_STROKE);
-  RNA_def_property_boolean_default(prop, false);
-  RNA_def_property_ui_icon(prop, ICON_AUTOMERGE_OFF, 1);
-  RNA_def_property_ui_text(
-      prop,
-      "Autoclose",
-      "Close the last drawn stroke before post processing");
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 
   prop = RNA_def_property(srna, "gpencil_sculpt", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, nullptr, "gp_sculpt");
@@ -8257,12 +8198,6 @@ static void rna_def_scene_eevee(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "High Bit Depth", "Use 32-bit shadows");
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, nullptr);
-
-  prop = RNA_def_property(srna, "use_shadow_id_high_bitdepth", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", SCE_EEVEE_SHADOW_ID_HIGH_BITDEPTH);
-  RNA_def_property_ui_text(prop, "High ID Bit Depth", "Use 32-bit shadow IDs (Enable if self-shadow does not work for some objects)");
-  RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
-  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 
   prop = RNA_def_property(srna, "use_soft_shadows", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, nullptr, "flag", SCE_EEVEE_SHADOW_SOFT);

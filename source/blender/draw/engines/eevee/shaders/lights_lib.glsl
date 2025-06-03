@@ -157,38 +157,7 @@ vec4 sample_cascade(sampler2DArray tex, vec2 co, float cascade_id)
 #define scube(x) shadows_cube_data[x]
 #define scascade(x) shadows_cascade_data[x]
 
-/*
-  Gather samples and manually compare against the resource_id, then interpolate the results.
-*/
-#ifdef USE_SHADOW_ID
-float sample_ID_texture(usampler2DArray TEX_ID, vec3 coord, bool match)
-{
-  uvec4 id_kernel = textureGather(TEX_ID, coord);
-  vec4 matches;
-  if (match) {
-    matches = vec4(equal(id_kernel, uvec4(resource_id)));
-  } else {
-    matches = vec4(notEqual(id_kernel, uvec4(resource_id)));
-  }
-
-  ivec3 tex_size = textureSize(TEX_ID, 0);
-  // WHY THE FLYING FUCK DO WE NEED AN EXTRA 0.00195?
-  vec2 fra = fract((coord.xy * tex_size.xy) + vec2(0.50195, 0.50195));
-
-  return mix(
-    mix(matches.w, matches.z, fra.x),
-    mix(matches.x, matches.y, fra.x),
-    fra.y
-  );
-}
-#else
-float sample_ID_texture(usampler2DArray TEX_ID, vec3 coord, bool match) {
-  return 0.0;
-}
-#endif
-
-
-float sample_cube_shadow(int shadow_id, vec3 P, bool match_shadow_id)
+float sample_cube_shadow(int shadow_id, vec3 P)
 {
   int data_id = int(sd(shadow_id).sh_data_index);
   vec3 cubevec = transform_point(scube(data_id).shadowmat, P);
@@ -200,17 +169,10 @@ float sample_cube_shadow(int shadow_id, vec3 P, bool match_shadow_id)
   vec2 coord = cubeFaceCoordEEVEE(cubevec, face, shadowCubeTexture);
   /* `tex_id == data_id` for cube shadow-map. */
   float tex_id = float(data_id);
-
-  vec4 coord_f = vec4(coord, tex_id * 6.0 + face, dist);
-
-#ifdef USE_SHADOW_ID
-  return min(sample_ID_texture(shadowCubeIDTexture, coord_f.xyz, match_shadow_id) + texture(shadowCubeTexture, coord_f), 1.0);
-#else
-  return texture(shadowCubeTexture, coord_f);
-#endif
+  return texture(shadowCubeTexture, vec4(coord, tex_id * 6.0 + face, dist));
 }
 
-float sample_cascade_shadow(int shadow_id, vec3 P, bool match_shadow_id)
+float sample_cascade_shadow(int shadow_id, vec3 P)
 {
   int data_id = int(sd(shadow_id).sh_data_index);
   float tex_id = scascade(data_id).sh_tex_index;
@@ -227,23 +189,13 @@ float sample_cascade_shadow(int shadow_id, vec3 P, bool match_shadow_id)
   /* Main cascade. */
   shpos = scascade(data_id).shadowmat[cascade] * vec4(P, 1.0);
   coord = vec4(shpos.xy, tex_id + float(cascade), shpos.z - sd(shadow_id).sh_bias);
-#ifdef USE_SHADOW_ID
-  float id_sample = sample_ID_texture(shadowCascadeIDTexture, coord.xyz, match_shadow_id);
-  vis += min(texture(shadowCascadeTexture, coord) + id_sample, 1.0)  * (1.0 - blend);
-#else
   vis += texture(shadowCascadeTexture, coord) * (1.0 - blend);
-#endif
 
   cascade = min(3, cascade + 1);
   /* Second cascade. */
   shpos = scascade(data_id).shadowmat[cascade] * vec4(P, 1.0);
   coord = vec4(shpos.xy, tex_id + float(cascade), shpos.z - sd(shadow_id).sh_bias);
-#ifdef USE_SHADOW_ID
-  id_sample = sample_ID_texture(shadowCascadeIDTexture, coord.xyz, match_shadow_id);
-  vis += min(texture(shadowCascadeTexture, coord) + id_sample, 1.0) * blend;
-#else
   vis += texture(shadowCascadeTexture, coord) * blend;
-#endif
 
   return saturate(vis);
 }
@@ -278,19 +230,9 @@ float spot_attenuation(LightData ld, vec3 l_vector)
   return spotmask;
 }
 
-float light_attenuation(LightData ld, vec4 l_vector, ivec4 light_groups)
+float light_attenuation(LightData ld, vec4 l_vector)
 {
   float vis = 1.0;
-#if !defined(VOLUME_LIGHTING) // && !defined(STEP_RESOLVE)
-  if (
-       (ld.light_group_bits.x & light_groups.x) == 0
-    && (ld.light_group_bits.y & light_groups.y) == 0
-    && (ld.light_group_bits.z & light_groups.z) == 0
-    && (ld.light_group_bits.w & light_groups.w) == 0
-  ) {
-    return 0.0;
-  }
-#endif
   if (ld.l_type == SPOT) {
     vis *= spot_attenuation(ld, l_vector.xyz);
   }
@@ -307,20 +249,15 @@ float light_attenuation(LightData ld, vec4 l_vector, ivec4 light_groups)
   return vis;
 }
 
-float light_shadowing(LightData ld, vec3 P, float vis, ivec4 light_group_shadows)
+float light_shadowing(LightData ld, vec3 P, float vis)
 {
 #if !defined(VOLUMETRICS) || defined(VOLUME_SHADOW)
-  if (ld.l_shadowid >= 0.0 && vis > 0.001 && !(
-        (ld.light_group_bits.x & light_group_shadows.x) == 0
-     && (ld.light_group_bits.y & light_group_shadows.y) == 0
-     && (ld.light_group_bits.z & light_group_shadows.z) == 0
-     && (ld.light_group_bits.w & light_group_shadows.w) == 0)
-  ) {
+  if (ld.l_shadowid >= 0.0 && vis > 0.001) {
     if (ld.l_type == SUN) {
-      vis *= sample_cascade_shadow(int(ld.l_shadowid), P, true);
+      vis *= sample_cascade_shadow(int(ld.l_shadowid), P);
     }
     else {
-      vis *= sample_cube_shadow(int(ld.l_shadowid), P, true);
+      vis *= sample_cube_shadow(int(ld.l_shadowid), P);
     }
   }
 #endif
@@ -328,14 +265,9 @@ float light_shadowing(LightData ld, vec3 P, float vis, ivec4 light_group_shadows
 }
 
 #ifndef VOLUMETRICS
-float light_contact_shadows(LightData ld, vec3 P, vec3 vP, vec3 vNg, float rand_x, float vis, ivec4 light_group_shadows)
+float light_contact_shadows(LightData ld, vec3 P, vec3 vP, vec3 vNg, float rand_x, float vis)
 {
-  if (ld.l_shadowid >= 0.0 && vis > 0.001 && !(
-     (ld.light_group_bits.x & light_group_shadows.x) == 0
-  && (ld.light_group_bits.y & light_group_shadows.y) == 0
-  && (ld.light_group_bits.z & light_group_shadows.z) == 0
-  && (ld.light_group_bits.w & light_group_shadows.w) == 0)
-  ) {
+  if (ld.l_shadowid >= 0.0 && vis > 0.001) {
     ShadowData sd = shadows_data[int(ld.l_shadowid)];
     /* Only compute if not already in shadow. */
     if (sd.sh_contact_dist > 0.0) {
@@ -371,10 +303,10 @@ float light_contact_shadows(LightData ld, vec3 P, vec3 vP, vec3 vNg, float rand_
 }
 #endif /* !VOLUMETRICS */
 
-float light_visibility(LightData ld, vec3 P, vec4 l_vector, ivec4 light_groups, ivec4 light_group_shadows)
+float light_visibility(LightData ld, vec3 P, vec4 l_vector)
 {
-  float l_atten = light_attenuation(ld, l_vector, light_groups);
-  return light_shadowing(ld, P, l_atten, light_group_shadows);
+  float l_atten = light_attenuation(ld, l_vector);
+  return light_shadowing(ld, P, l_atten);
 }
 
 float light_diffuse(LightData ld, vec3 N, vec3 V, vec4 l_vector)

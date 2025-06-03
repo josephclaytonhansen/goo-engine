@@ -23,8 +23,8 @@
 
 #include "BLT_translation.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 /* Allow using deprecated functionality for .blend file I/O. */
 #define DNA_DEPRECATED_ALLOW
@@ -43,7 +43,7 @@
 #include "BKE_gpencil_legacy.h"
 #include "BKE_gpencil_update_cache_legacy.h"
 #include "BKE_icons.h"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_image.h"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_query.hh"
@@ -661,9 +661,8 @@ bGPDlayer *BKE_gpencil_layer_addnew(bGPdata *gpd,
                  offsetof(bGPDlayer, info),
                  sizeof(gpl->info));
 
-  // /* Keep use lights disabled by default as we almost never use it */
-  // /* Enable always affected by scene lights. */
-  // gpl->flag |= GP_LAYER_USE_LIGHTS;
+  /* Enable always affected by scene lights. */
+  gpl->flag |= GP_LAYER_USE_LIGHTS;
 
   /* Init transform. */
   zero_v3(gpl->location);
@@ -1027,7 +1026,7 @@ void BKE_gpencil_stroke_copy_settings(const bGPDstroke *gps_src, bGPDstroke *gps
   copy_v2_v2_short(gps_dst->caps, gps_src->caps);
   gps_dst->hardness = gps_src->hardness;
   copy_v2_v2(gps_dst->aspect_ratio, gps_src->aspect_ratio);
-  gps_dst->fill_opacity_fac = gps_src->fill_opacity_fac;
+  gps_dst->fill_opacity_fac = gps_dst->fill_opacity_fac;
   copy_v3_v3(gps_dst->boundbox_min, gps_src->boundbox_min);
   copy_v3_v3(gps_dst->boundbox_max, gps_src->boundbox_max);
   gps_dst->uv_rotation = gps_src->uv_rotation;
