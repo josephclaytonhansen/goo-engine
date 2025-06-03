@@ -96,6 +96,8 @@ class DATA_PT_lens(CameraButtonsPanel, Panel):
             elif cam.lens_unit == 'FOV':
                 col.prop(cam, "angle")
             col.prop(cam, "lens_unit")
+            col.prop(cam, "resolution_x", text = "Resolution X")
+            col.prop(cam, "resolution_y", text = "Resolution Y")
 
         elif cam.type == 'ORTHO':
             col.prop(cam, "ortho_scale")
@@ -588,3 +590,4 @@ if __name__ == "__main__":  # only for live edit.
     from bpy.utils import register_class
     for cls in classes:
         register_class(cls)
+
