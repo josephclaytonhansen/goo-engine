@@ -569,11 +569,11 @@ option(WITH_CPU_SIMD "Enable SIMD instruction if they're detected on the host ma
 mark_as_advanced(WITH_CPU_SIMD)
 
 # Cycles
-option(WITH_CYCLES "Enable Cycles Render Engine" ON)
-option(WITH_CYCLES_OSL "Build Cycles with OpenShadingLanguage support" ON)
-option(WITH_CYCLES_PATH_GUIDING "Build Cycles with path guiding support" ON)
-option(WITH_CYCLES_EMBREE "Build Cycles with Embree support" ON)
-option(WITH_CYCLES_LOGGING "Build Cycles with logging support" ON)
+option(WITH_CYCLES "Enable Cycles Render Engine" OFF)
+option(WITH_CYCLES_OSL "Build Cycles with OpenShadingLanguage support" OFF)
+option(WITH_CYCLES_PATH_GUIDING "Build Cycles with path guiding support" OFF)
+option(WITH_CYCLES_EMBREE "Build Cycles with Embree support" OFF)
+option(WITH_CYCLES_LOGGING "Build Cycles with logging support" OFF)
 option(WITH_CYCLES_DEBUG "Build Cycles with options useful for debugging (e.g., MIS)" OFF)
 
 option(WITH_CYCLES_STANDALONE "Build Cycles standalone application" OFF)
@@ -641,7 +641,7 @@ endif()
 
 # AMD HIP
 if(NOT APPLE)
-  option(WITH_CYCLES_DEVICE_HIP "Enable Cycles AMD HIP support" ON)
+  option(WITH_CYCLES_DEVICE_HIP "Enable Cycles AMD HIP support" OFF)
   option(WITH_CYCLES_HIP_BINARIES "Build Cycles AMD HIP binaries" OFF)
   # Radeon VII (gfx906) not currently working with HIP SDK, so left out of the list.
   set(CYCLES_HIP_BINARIES_ARCH
@@ -663,7 +663,7 @@ endif()
 
 # Apple Metal
 if(APPLE)
-  option(WITH_CYCLES_DEVICE_METAL "Enable Cycles Apple Metal compute support" ON)
+  option(WITH_CYCLES_DEVICE_METAL "Enable Cycles Apple Metal compute support" OFF)
 endif()
 
 # oneAPI
@@ -755,7 +755,7 @@ endif()
 if("${BLENDER_VERSION_CYCLE}" STREQUAL "alpha")
   set(WITH_EXPERIMENTAL_FEATURES ON)
 else()
-  set(WITH_EXPERIMENTAL_FEATURES OFF)
+  set(WITH_EXPERIMENTAL_FEATURES ON)
 endif()
 
 # Unit testing
