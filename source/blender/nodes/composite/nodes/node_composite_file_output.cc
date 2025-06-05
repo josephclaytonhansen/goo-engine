@@ -37,9 +37,10 @@
 
 #include "WM_api.hh"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_openexr.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_openexr.h"
 
 #include "GPU_state.h"
 #include "GPU_texture.h"

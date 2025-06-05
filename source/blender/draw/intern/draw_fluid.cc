@@ -20,7 +20,7 @@
 
 #include "BKE_colorband.hh"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "GPU_texture.h"
 

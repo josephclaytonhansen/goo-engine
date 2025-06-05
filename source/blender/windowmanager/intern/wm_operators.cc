@@ -62,7 +62,7 @@
 #include "BKE_screen.hh" /* BKE_ST_MAXNAME */
 #include "BKE_unit.hh"
 
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 
 #include "BLF_api.h"
 
@@ -71,7 +71,7 @@
 #include "GPU_matrix.h"
 #include "GPU_state.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "ED_fileselect.hh"
 #include "ED_gpencil_legacy.hh"

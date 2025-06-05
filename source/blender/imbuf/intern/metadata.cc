@@ -19,10 +19,10 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
-#include "IMB_metadata.hh"
+#include "IMB_metadata.h"
 
 void IMB_metadata_ensure(IDProperty **metadata)
 {

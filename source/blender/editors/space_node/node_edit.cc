@@ -65,7 +65,7 @@
 #include "GPU_capabilities.h"
 #include "GPU_material.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "NOD_composite.hh"
 #include "NOD_geometry.hh"

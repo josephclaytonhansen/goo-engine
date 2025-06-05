@@ -7,7 +7,7 @@
 #include "BKE_image.h"
 #include "BKE_movieclip.h"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 namespace blender::compositor {
 

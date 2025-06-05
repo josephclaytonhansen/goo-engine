@@ -4,7 +4,7 @@
 
 #include "node_shader_util.hh"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 namespace blender::nodes::node_shader_wavelength_cc {
 

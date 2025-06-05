@@ -472,7 +472,7 @@ def disable(module_name, *, default_set=False, handle_error=None):
     # the add-on in the user preferences.
     if mod and getattr(mod, "__addon_enabled__", False) is not False:
         mod.__addon_enabled__ = False
-        mod.__addon_persistent__ = False
+        mod.__addon_persistent = False
 
         try:
             mod.unregister()
@@ -485,7 +485,7 @@ def disable(module_name, *, default_set=False, handle_error=None):
         print(
             "addon_utils.disable: %s not %s" % (
                 module_name,
-                "loaded" if mod is None else "enabled")
+                "disabled" if mod is None else "loaded")
         )
 
     # could be in more than once, unlikely but better do this just in case.

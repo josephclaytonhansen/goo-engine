@@ -12,7 +12,7 @@
 #include "DNA_image_types.h"
 #include "DNA_scene_types.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "BKE_image.h"
 

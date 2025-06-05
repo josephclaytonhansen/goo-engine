@@ -22,7 +22,7 @@
 #include "BLI_tempfile.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_appdir.hh" /* own include */
+#include "BKE_appdir.h" /* own include */
 #include "BKE_blender_version.h"
 
 #include "BLT_translation.h"
@@ -951,13 +951,13 @@ bool BKE_appdir_program_python_search(char *program_filepath,
   /* Check both possible names. */
   const char *python_names[] = {
 #ifdef PYTHON_EXECUTABLE_NAME
-    python_build_def,
+      python_build_def,
 #endif
 #if defined(WIN32) && !defined(NDEBUG)
-    basename_debug,
+      basename_debug,
 #endif
-    python_version,
-    basename,
+      python_version,
+      basename,
   };
   bool is_found = false;
 

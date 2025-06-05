@@ -36,9 +36,10 @@
 
 #include "WM_types.hh"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_metadata.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_metadata.h"
 
 #include "SEQ_iterator.hh"
 #include "SEQ_proxy.hh"

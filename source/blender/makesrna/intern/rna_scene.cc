@@ -23,7 +23,8 @@
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_colormanagement.h"
+#include "IMB_imbuf_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
@@ -35,7 +36,7 @@
 
 #include "BKE_armature.hh"
 #include "BKE_editmesh.hh"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_paint.hh"
 #include "BKE_volume.hh"
 

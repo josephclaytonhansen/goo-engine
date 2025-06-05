@@ -65,6 +65,8 @@
 #include "GPU_uniform_buffer.h"
 #include "GPU_viewport.h"
 
+#include "IMB_colormanagement.h"
+
 #include "RE_engine.h"
 #include "RE_pipeline.h"
 

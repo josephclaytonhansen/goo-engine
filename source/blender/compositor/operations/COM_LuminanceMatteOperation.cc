@@ -4,7 +4,7 @@
 
 #include "COM_LuminanceMatteOperation.h"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 namespace blender::compositor {
 

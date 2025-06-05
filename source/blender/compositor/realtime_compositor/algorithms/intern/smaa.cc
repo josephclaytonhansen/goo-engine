@@ -4,7 +4,7 @@
 
 #include "BLI_assert.h"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "GPU_shader.h"
 #include "GPU_texture.h"

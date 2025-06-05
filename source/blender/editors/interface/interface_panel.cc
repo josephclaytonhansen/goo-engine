@@ -1336,6 +1336,8 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
   /* Intentionally don't scale by 'px'. */
   const int rct_xmin = is_left ? v2d->mask.xmin + 3 : (v2d->mask.xmax - category_tabs_width);
   const int rct_xmax = is_left ? v2d->mask.xmin + category_tabs_width : (v2d->mask.xmax - 3);
+  const int text_v_ofs = (rct_xmax - rct_xmin) * 0.3f;
+
   int y_ofs = tab_v_pad;
 
   /* Primary theme colors. */

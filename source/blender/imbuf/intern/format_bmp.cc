@@ -8,8 +8,8 @@
 
 #include "oiio/openimageio_support.hh"
 
-#include "IMB_filetype.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_filetype.h"
+#include "IMB_imbuf_types.h"
 
 OIIO_NAMESPACE_USING
 using namespace blender::imbuf;

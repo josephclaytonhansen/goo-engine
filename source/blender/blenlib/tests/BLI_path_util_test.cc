@@ -4,7 +4,7 @@
 
 #include "testing/testing.h"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 #include "BLI_fileops.h"
 #include "BLI_path_util.h"

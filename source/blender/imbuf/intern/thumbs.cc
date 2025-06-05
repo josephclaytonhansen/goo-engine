@@ -26,10 +26,10 @@
 
 #include "DNA_space_types.h" /* For FILE_MAX_LIBEXTRA */
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_metadata.hh"
-#include "IMB_thumbs.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_metadata.h"
+#include "IMB_thumbs.h"
 
 #include <cctype>
 #include <cstring>

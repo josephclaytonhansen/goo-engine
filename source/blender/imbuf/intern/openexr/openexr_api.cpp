@@ -85,12 +85,13 @@
 #include "BKE_idprop.h"
 #include "BKE_image.h"
 
-#include "IMB_allocimbuf.hh"
-#include "IMB_colormanagement.hh"
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
-#include "IMB_metadata.hh"
-#include "IMB_openexr.hh"
+#include "IMB_allocimbuf.h"
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
+#include "IMB_metadata.h"
+#include "IMB_openexr.h"
 
 using namespace Imf;
 using namespace Imath;

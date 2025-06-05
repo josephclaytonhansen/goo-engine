@@ -44,8 +44,8 @@
 /* vertex box select */
 #include "BKE_global.h"
 #include "BKE_main.hh"
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "BKE_action.h"
 #include "BKE_armature.hh"
@@ -5019,6 +5019,7 @@ static bool armature_circle_select(ViewContext *vc,
 
   if (data.is_changed) {
     ED_armature_edit_sync_selection(arm->edbo);
+    ED_armature_edit_validate_active(arm);
     WM_main_add_notifier(NC_OBJECT | ND_BONE_SELECT, vc->obedit);
   }
   return data.is_changed;

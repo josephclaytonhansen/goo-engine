@@ -8,7 +8,7 @@
 #include "node_util.hh"
 
 #include "BLI_color.hh"
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 namespace blender::nodes::node_shader_blackbody_cc {
 

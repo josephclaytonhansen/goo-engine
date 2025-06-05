@@ -14,7 +14,7 @@
 
 #include "BKE_scene.h"
 
-#include "IMB_imbuf.hh"
+#include "IMB_imbuf.h"
 
 #include "multiview.hh"
 

@@ -30,7 +30,7 @@
 
 #include "BLF_api.h"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "GPU_matrix.h"
 #include "GPU_shader.h"

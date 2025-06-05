@@ -72,4 +72,4 @@ waveletNoiseTile.bin
 CMakeSettings.json
 CMakePresets.json
 CMakeUserPresets.json
-build/bin/4.1/scripts/startup/bl_ui/properties_data_camera.py
+*.bak

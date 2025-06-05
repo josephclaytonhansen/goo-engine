@@ -8,7 +8,7 @@
 
 #include "BLI_assert.h"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "BKE_colorband.hh"
 

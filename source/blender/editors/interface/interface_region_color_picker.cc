@@ -32,7 +32,7 @@
 
 #include "ED_screen.hh"
 
-#include "IMB_colormanagement.hh"
+#include "IMB_colormanagement.h"
 
 #include "interface_intern.hh"
 

@@ -30,7 +30,7 @@
 
 #include "BKE_animsys.h"
 #include "BKE_curve.hh"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 
 #include "BKE_anim_data.h"
 #include "BKE_image.h"
@@ -131,6 +131,7 @@ static void mask_blend_write(BlendWriter *writer, ID *id, const void *id_address
 static void mask_blend_read_data(BlendDataReader *reader, ID *id)
 {
   Mask *mask = (Mask *)id;
+  BLO_read_data_address(reader, &mask->adt);
 
   BLO_read_list(reader, &mask->masklayers);
 

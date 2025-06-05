@@ -1511,6 +1511,7 @@ static int armature_hide_exec(bContext *C, wmOperator *op)
     if (!changed) {
       continue;
     }
+    ED_armature_edit_validate_active(arm);
     ED_armature_edit_sync_selection(arm->edbo);
 
     WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, obedit);
@@ -1571,6 +1572,7 @@ static int armature_reveal_exec(bContext *C, wmOperator *op)
     }
 
     if (changed) {
+      ED_armature_edit_validate_active(arm);
       ED_armature_edit_sync_selection(arm->edbo);
 
       WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, obedit);

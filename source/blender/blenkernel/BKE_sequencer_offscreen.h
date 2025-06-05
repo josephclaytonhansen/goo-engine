@@ -7,7 +7,7 @@
 /** \file
  * \ingroup bke
  */
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #ifdef __cplusplus
 extern "C" {

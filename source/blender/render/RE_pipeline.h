@@ -55,8 +55,8 @@ typedef struct RenderView {
 typedef struct RenderPass {
   struct RenderPass *next, *prev;
   int channels;
-  char name[64];   /* amount defined in IMB_openexr.hh */
-  char chan_id[8]; /* amount defined in IMB_openexr.hh */
+  char name[64];   /* amount defined in IMB_openexr.h */
+  char chan_id[8]; /* amount defined in IMB_openexr.h */
 
   /* Image buffer which contains data of this pass.
    *

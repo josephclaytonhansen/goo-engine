@@ -17,7 +17,7 @@
 
 #include "RE_pipeline.h"
 
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf_types.h"
 
 #include "gpencil_engine.h"
 

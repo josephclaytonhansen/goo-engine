@@ -14,7 +14,7 @@
 
 using namespace std;
 
-#include "BKE_appdir.hh"
+#include "BKE_appdir.h"
 
 namespace Freestyle::Config {
 

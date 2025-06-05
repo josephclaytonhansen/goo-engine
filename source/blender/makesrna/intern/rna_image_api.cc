@@ -32,7 +32,8 @@
 #  include "BKE_scene.h"
 #  include <errno.h>
 
-#  include "IMB_imbuf.hh"
+#  include "IMB_colormanagement.h"
+#  include "IMB_imbuf.h"
 
 #  include "DNA_image_types.h"
 #  include "DNA_scene_types.h"

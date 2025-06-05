@@ -46,7 +46,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
 #include "BKE_grease_pencil.hh"
-#include "BKE_idtype.hh"
+#include "BKE_idtype.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.hh"
 #include "BKE_lib_override.hh"
@@ -3783,7 +3783,7 @@ void OUTLINER_OT_operation(wmOperatorType *ot)
 
   ot->invoke = outliner_operation_invoke;
 
-  ot->poll = ED_operator_region_outliner_active;
+  ot->poll = ED_operator_outliner_active;
 }
 
 /** \} */

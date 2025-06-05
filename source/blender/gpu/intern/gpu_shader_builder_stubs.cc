@@ -10,8 +10,8 @@
 
 #include "BLI_utildefines.h"
 
-#include "IMB_imbuf.hh"
-#include "IMB_imbuf_types.hh"
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "BKE_attribute.hh"
 #include "BKE_customdata.hh"
@@ -212,7 +212,7 @@ extern void DRW_deferred_shader_remove(struct GPUMaterial * /*mat*/)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Stubs of IMB_imbuf.hh
+/** \name Stubs of IMB_imbuf.h
  * \{ */
 extern "C" struct ImBuf *IMB_ibImageFromMemory(const unsigned char * /*mem*/,
                                                size_t /*size*/,
