@@ -58,7 +58,10 @@ if NOT EXIST %BUILD_VS_LIBDIR% (
 					exit /b 1
 				)
 			)
-		)
+		) else (
+           echo Not downloading libraries, until this is resolved you CANNOT make a successful blender build.
+           exit /b 1
+        )
 	)
 ) else (
 	if NOT EXIST "%PYTHON%" (
@@ -66,7 +69,7 @@ if NOT EXIST %BUILD_VS_LIBDIR% (
 			echo.
 			echo Python not found in external libraries, updating to latest version
 			echo.
-			"%SVN%" update %BUILD_VS_LIBDIR%
+			"%GIT%" -C "%BLENDER_DIR%" submodule update "%BUILD_VS_LIBDIR%"
 		)
 	)
 )
@@ -76,8 +79,8 @@ if NOT EXIST %BUILD_VS_LIBDIR% (
 	echo Error: Required libraries not found at "%BUILD_VS_LIBDIR%"
 	echo This is needed for building, aborting!
 	echo.
-	if "%SVN%"=="" (
-		echo This is most likely caused by svn.exe not being available.
+	if "%GIT%"=="" (
+		echo This is most likely caused by git.exe not being available.
 	)
 	exit /b 1
 )
