@@ -303,29 +303,29 @@ static void version_principled_bsdf_update_animdata(ID *owner_id, bNodeTree *ntr
   }
 }
 
-//static void versioning_eevee_shadow_settings(Object *object)
-//{
-//  /** EEVEE no longer uses the Material::blend_shadow property.
-//   * Instead, it uses Object::visibility_flag for disabling shadow casting
-//   */
-//
-//  short *material_len = BKE_object_material_len_p(object);
-//  if (!material_len) {
-//    return;
-//  }
-//
-//  using namespace blender;
-//  bool hide_shadows = *material_len > 0;
-//  for (int i : IndexRange(*material_len)) {
-//    Material *material = BKE_object_material_get(object, i + 1);
-//    if (!material || material->blend_shadow != MA_BS_NONE) {
-//      hide_shadows = false;
-//    }
-//  }
-//
-//  /* Enable the hide_shadow flag only if there's not any shadow casting material. */
-//  SET_FLAG_FROM_TEST(object->visibility_flag, hide_shadows, OB_HIDE_SHADOW);
-//}
+static void versioning_eevee_shadow_settings(Object *object)
+{
+  /** EEVEE no longer uses the Material::blend_shadow property.
+   * Instead, it uses Object::visibility_flag for disabling shadow casting
+   */
+
+  short *material_len = BKE_object_material_len_p(object);
+  if (!material_len) {
+    return;
+  }
+
+  using namespace blender;
+  bool hide_shadows = *material_len > 0;
+  for (int i : IndexRange(*material_len)) {
+    Material *material = BKE_object_material_get(object, i + 1);
+    if (!material || material->blend_shadow != MA_BS_NONE) {
+      hide_shadows = false;
+    }
+  }
+
+  /* Enable the hide_shadow flag only if there's not any shadow casting material. */
+  SET_FLAG_FROM_TEST(object->visibility_flag, hide_shadows, OB_HIDE_SHADOW);
+}
 
 static void versioning_replace_splitviewer(bNodeTree *ntree)
 {
