@@ -51,15 +51,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--use-tests", action="store_true")
     parser.add_argument("--git-command", default="git")
     parser.add_argument("--use-linux-libraries", action="store_true")
-<<<<<<< HEAD
     parser.add_argument("--architecture", type=str, choices=("x86_64", "amd64", "arm64",))
     parser.add_argument("--windows-vc-version", type=str, choices=("vc15", "vc17"), default="vc17", help="Visual C++ version for Windows precompiled libraries (default: vc17 for VS2022)")
     parser.add_argument("--addons-repo-name", default="blender-addons", help="Name of the addons repository (e.g., blender-addons or custom-fork-name)")
     parser.add_argument("--addons-contrib-repo-name", default="blender-addons-contrib", help="Name of the addons_contrib repository (e.g., blender-addons-contrib or custom-fork-name)")
-=======
-    parser.add_argument("--architecture", type=str,
-                        choices=("x86_64", "amd64", "arm64",))
->>>>>>> upstream/goo-engine-v4.1-release
     return parser.parse_args()
 
 
@@ -104,7 +99,6 @@ def get_effective_architecture(args: argparse.Namespace) -> str:
     architecture: Optional[str] = args.architecture
     if architecture:
         assert isinstance(architecture, str)
-<<<<<<< HEAD
         return architecture
 
     # Check platform.version to detect arm64 with x86_64 python binary.
@@ -156,11 +150,6 @@ def svn_update(args: argparse.Namespace, release_version: Optional[str]) -> None
             lib_platform = "win64_vc17"  # For VS2022
     elif args.use_linux_libraries:
         lib_platform = "linux_x86_64_glibc_228"
-=======
-    elif "ARM64" in platform.version():
-        # Check platform.version to detect arm64 with x86_64 python binary.
-        architecture = "arm64"
->>>>>>> upstream/goo-engine-v4.1-release
     else:
         architecture = platform.machine().lower()
 
@@ -367,29 +356,15 @@ def external_script_copy_old_submodule_over(
     call((args.git_command, "config", "--file", str(git_config), "--unset", "core.worktree"))
 
 
-<<<<<<< HEAD
 def external_script_initialize_if_needed(args: argparse.Namespace,
                                          actual_repo_name: str,
                                          directory_name: str) -> None:
     """Initialize checkout of an external repository scripts directory"""
-=======
-def floating_checkout_initialize_if_needed(
-        args: argparse.Namespace,
-        repo_name: str,
-        directory: Path,
-        old_submodules_dir: Optional[Path] = None,
-) -> None:
-    """Initialize checkout of an external repository"""
->>>>>>> upstream/goo-engine-v4.1-release
 
     blender_git_root = get_blender_git_root()
     blender_dot_git = blender_git_root / ".git"
-<<<<<<< HEAD
     scripts_dir = blender_git_root / "scripts"
     external_dir: Path = scripts_dir / directory_name
-=======
-    external_dir = blender_git_root / directory
->>>>>>> upstream/goo-engine-v4.1-release
 
     if external_dir.exists():
         return
@@ -451,17 +426,9 @@ def floating_checkout_initialize_if_needed(
     call((args.git_command, "clone", "--origin", remote_name_for_clone, external_repo_url_to_clone, str(external_dir)))
 
 
-<<<<<<< HEAD
 def external_script_add_origin_if_needed(args: argparse.Namespace,
                                          actual_repo_name: str,
                                          directory_name: str) -> None:
-=======
-def floating_checkout_add_origin_if_needed(
-        args: argparse.Namespace,
-        repo_name: str,
-        directory: Path,
-) -> None:
->>>>>>> upstream/goo-engine-v4.1-release
     """
     Add remote called 'origin' if there is a fork of the external repository available
 
@@ -518,7 +485,6 @@ def floating_checkout_add_origin_if_needed(
     return
 
 
-<<<<<<< HEAD
 def external_scripts_update(args: argparse.Namespace,
                             actual_repo_name: str,
                             directory_name: str,
@@ -529,31 +495,6 @@ def external_scripts_update(args: argparse.Namespace,
     external_script_add_origin_if_needed(args, actual_repo_name, directory_name)
 
     print(f"Updating scripts/{directory_name} (from repository '{actual_repo_name}')...")
-=======
-def floating_checkout_update(
-        args: argparse.Namespace,
-        repo_name: str,
-        directory: Path,
-        branch: Optional[str],
-        old_submodules_dir: Optional[Path] = None,
-        only_update: bool = False,
-) -> str:
-    """Update a single external checkout with the given name in the scripts folder"""
-
-    blender_git_root = get_blender_git_root()
-    external_dir = blender_git_root / directory
-
-    if only_update and not external_dir.exists():
-        return ""
-
-    floating_checkout_initialize_if_needed(args, repo_name, directory, old_submodules_dir)
-    floating_checkout_add_origin_if_needed(args, repo_name, directory)
-
-    blender_git_root = get_blender_git_root()
-    external_dir = blender_git_root / directory
-
-    print(f"* Updating {directory} ...")
->>>>>>> upstream/goo-engine-v4.1-release
 
     cwd = os.getcwd()
 
