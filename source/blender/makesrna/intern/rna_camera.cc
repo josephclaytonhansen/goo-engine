@@ -961,11 +961,13 @@ void RNA_def_camera(BlenderRNA *brna)
   RNA_def_property_int_sdna(prop, NULL, "resolution_x");
   RNA_def_property_range(prop, 4, 10000);
   RNA_def_property_ui_text(prop, "Resolution X", "Camera-specific X resolution in pixels");
+  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Scene_render_update");
 
   prop = RNA_def_property(srna, "resolution_y", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "resolution_y");
   RNA_def_property_range(prop, 4, 10000);
   RNA_def_property_ui_text(prop, "Resolution Y", "Camera-specific Y resolution in pixels");
+  RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_Scene_render_update");
 }
 
 #endif
