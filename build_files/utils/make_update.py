@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 """
-"make update" for all platforms, updating svn libraries and tests and Blender
-git repository and sub-modules.
+"make update" for all platforms, updating Git LFS submodules for libraries and
+tests, and Blender git repository.
 
 For release branches, this will check out the appropriate branches of
-sub-modules and libraries.
+submodules and libraries.
 """
 
 import argparse
@@ -20,191 +20,176 @@ import sys
 import make_utils
 from pathlib import Path
 from make_utils import call, check_output
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from typing import (
     Optional,
+    Tuple,
 )
-
-
-class Submodule:
-    path: str
-    branch: str
-    branch_fallback: str
-
-    def __init__(self, path: str, branch: str, branch_fallback: str) -> None:
-        self.path = path
-        self.branch = branch
-        self.branch_fallback = branch_fallback
 
 
 def print_stage(text: str) -> None:
     print("")
     print(text)
+    print("=" * len(text))
     print("")
-
-# Parse arguments
 
 
 def parse_arguments() -> argparse.Namespace:
+    """
+    Parse command line line arguments.
+
+    Returns parsed object from which the command line arguments can be accessed
+    as properties. The name of the properties matches the command line argument,
+    but with the leading dashed omitted and all remaining dashes replaced with
+    underscore.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-libraries", action="store_true")
     parser.add_argument("--no-blender", action="store_true")
     parser.add_argument("--no-submodules", action="store_true")
     parser.add_argument("--use-tests", action="store_true")
-    parser.add_argument("--svn-command", default="svn")
-    parser.add_argument("--svn-branch", default=None)
     parser.add_argument("--git-command", default="git")
     parser.add_argument("--use-linux-libraries", action="store_true")
-    parser.add_argument("--architecture", type=str, choices=("x86_64", "amd64", "arm64",))
-    parser.add_argument("--windows-vc-version", type=str, choices=("vc15", "vc17"), default="vc17", help="Visual C++ version for Windows precompiled libraries (default: vc17 for VS2022)")
-    parser.add_argument("--addons-repo-name", default="blender-addons", help="Name of the addons repository (e.g., blender-addons or custom-fork-name)")
-    parser.add_argument("--addons-contrib-repo-name", default="blender-addons-contrib", help="Name of the addons_contrib repository (e.g., blender-addons-contrib or custom-fork-name)")
+    parser.add_argument("--architecture", type=str,
+                        choices=("x86_64", "amd64", "arm64",))
     return parser.parse_args()
 
 
-def get_blender_git_root() -> str:
-    return check_output([args.git_command, "rev-parse", "--show-toplevel"])
+def get_blender_git_root() -> Path:
+    """
+    Get root directory of the current Git directory.
+    """
+    return Path(
+        check_output([args.git_command, "rev-parse", "--show-toplevel"]))
 
-# Setup for precompiled libraries and tests from svn.
+
+def get_effective_platform(args: argparse.Namespace) -> str:
+    """
+    Get platform of the host.
+
+    The result string is normalized to the name used by Blender releases and
+    library repository name prefixes: linux, macos, windows.
+    """
+
+    if sys.platform == "darwin":
+        platform = "macos"
+    elif sys.platform == "win32":
+        platform = "windows"
+    else:
+        platform = sys.platform
+
+    assert (platform in ("linux", "macos", "windows"))
+
+    return platform
 
 
 def get_effective_architecture(args: argparse.Namespace) -> str:
-    architecture = args.architecture
+    """
+    Get architecture of the host.
+
+    The result string is normalized to the architecture name used by the Blender
+    releases and library repository name suffixes: x64, arm64.
+
+    NOTE: When cross-compiling the architecture is coming from the command line
+    argument.
+    """
+    architecture: Optional[str] = args.architecture
     if architecture:
         assert isinstance(architecture, str)
-        return architecture
-
-    # Check platform.version to detect arm64 with x86_64 python binary.
-    if "ARM64" in platform.version():
-        return "arm64"
-
-    return platform.machine().lower()
-
-
-def svn_update(args: argparse.Namespace, release_version: Optional[str]) -> None:
-    svn_non_interactive = [args.svn_command, '--non-interactive']
-
-    # Get the base SVN URL for libraries from make_utils
-    # This URL is expected to point to the 'lib' directory for the given version/branch.
-    # e.g., https://svn.blender.org/svnroot/bf-blender/tags/blender-4.1-release/lib/
-    svn_url = make_utils.svn_libraries_base_url(release_version, args.svn_branch)
-
-    # Correct svn_url if args.svn_branch is a tag and make_utils incorrectly prepended "branches/"
-    if args.svn_branch and args.svn_branch.startswith("tags/"):
-        # Define the expected correct base and the faulty segment
-        correct_base_url_prefix = "https://svn.blender.org/svnroot/bf-blender/"
-        faulty_path_segment_in_url = "/branches/" + args.svn_branch # e.g., /branches/tags/blender-4.1-release
-        correct_path_segment_for_tag = "/" + args.svn_branch      # e.g., /tags/blender-4.1-release
-
-        if faulty_path_segment_in_url in svn_url:
-            print(f"---- DEBUG make_update.py: Correcting SVN URL for tag-based lib ----")
-            print(f"---- Original svn_url: {svn_url}")
-            svn_url = svn_url.replace(faulty_path_segment_in_url, correct_path_segment_for_tag)
-            print(f"---- Corrected svn_url: {svn_url}")
-
-    lib_dirpath = os.path.join(get_blender_git_root(), '..', 'lib')
-
-    # Checkout precompiled libraries
-    architecture = get_effective_architecture(args)
-    if sys.platform == 'darwin':
-        if architecture == 'arm64':
-            lib_platform = "darwin_arm64"
-        elif architecture == 'x86_64':
-            lib_platform = "darwin"
-        else:
-            lib_platform = None
-    elif sys.platform == 'win32':
-        # Windows checkout is usually handled by bat scripts since python3 to run
-        # this script is bundled as part of the precompiled libraries. However it
-        # is used by the buildbot.
-        if args.windows_vc_version == "vc15":
-            lib_platform = "win64_vc15"  # For VS2017
-        else:  # vc17 (default)
-            lib_platform = "win64_vc17"  # For VS2022
-    elif args.use_linux_libraries:
-        lib_platform = "linux_x86_64_glibc_228"
+    elif "ARM64" in platform.version():
+        # Check platform.version to detect arm64 with x86_64 python binary.
+        architecture = "arm64"
     else:
-        # No precompiled libraries for Linux.
-        lib_platform = None
+        architecture = platform.machine().lower()
 
-    if lib_platform:
-        lib_platform_dirpath = os.path.join(lib_dirpath, lib_platform)
+    # Normalize the architecture name.
+    if architecture in {"x86_64", "amd64"}:
+        architecture = "x64"
 
-        if not os.path.exists(lib_platform_dirpath):
-            print_stage("Checking out Precompiled Libraries")
+    assert (architecture in {"x64", "arm64"})
 
-            if make_utils.command_missing(args.svn_command):
-                sys.stderr.write("svn not found, can't checkout libraries\n")
-                sys.exit(1)
-
-            svn_url_platform = svn_url + lib_platform
-            call(svn_non_interactive + ["checkout", svn_url_platform, lib_platform_dirpath])
-
-    if args.use_tests:
-        lib_tests = "tests"
-        lib_tests_dirpath = os.path.join(lib_dirpath, lib_tests)
-
-        if not os.path.exists(lib_tests_dirpath):
-            print_stage("Checking out Tests")
-
-            if make_utils.command_missing(args.svn_command):
-                sys.stderr.write("svn not found, can't checkout tests\n")
-                sys.exit(1)
-
-            svn_url_tests = svn_url + lib_tests
-            call(svn_non_interactive + ["checkout", svn_url_tests, lib_tests_dirpath])
-
-    lib_assets = "assets"
-    lib_assets_dirpath = os.path.join(lib_dirpath, lib_assets)
-
-    if not os.path.exists(lib_assets_dirpath):
-        print_stage("Checking out Assets")
-
-        if make_utils.command_missing(args.svn_command):
-            sys.stderr.write("svn not found, can't checkout assets\n")
-            sys.exit(1)
-
-        svn_url_assets = svn_url + lib_assets
-        call(svn_non_interactive + ["checkout", svn_url_assets, lib_assets_dirpath])
-
-    # Update precompiled libraries, assets and tests
-
-    if not os.path.isdir(lib_dirpath):
-        print("Library path: %r, not found, skipping" % lib_dirpath)
-    else:
-        paths_local_and_remote = []
-        if os.path.exists(os.path.join(lib_dirpath, ".svn")):
-            print_stage("Updating Precompiled Libraries, Assets and Tests (one repository)")
-            paths_local_and_remote.append((lib_dirpath, svn_url))
-        else:
-            print_stage("Updating Precompiled Libraries, Assets and Tests (multiple repositories)")
-            # Separate paths checked out.
-            for dirname in os.listdir(lib_dirpath):
-                if dirname.startswith("."):
-                    # Temporary paths such as ".mypy_cache" will report a warning, skip hidden directories.
-                    continue
-
-                dirpath = os.path.join(lib_dirpath, dirname)
-                if not (os.path.isdir(dirpath) and os.path.exists(os.path.join(dirpath, ".svn"))):
-                    continue
-
-                paths_local_and_remote.append((dirpath, svn_url + dirname))
-
-        if paths_local_and_remote:
-            if make_utils.command_missing(args.svn_command):
-                sys.stderr.write("svn not found, can't update libraries\n")
-                sys.exit(1)
-
-            for dirpath, svn_url_full in paths_local_and_remote:
-                call(svn_non_interactive + ["cleanup", dirpath])
-                # Switch to appropriate branch and update.
-                call(svn_non_interactive + ["switch", svn_url_full, dirpath], exit_on_error=False)
-                call(svn_non_interactive + ["update", dirpath])
+    assert isinstance(architecture, str)
+    return architecture
 
 
-# Test if git repo can be updated.
+def get_submodule_directories(args: argparse.Namespace) -> Tuple[Path, ...]:
+    """
+    Get list of all configured submodule directories.
+    """
+
+    blender_git_root = get_blender_git_root()
+    dot_modules = blender_git_root / ".gitmodules"
+
+    if not dot_modules.exists():
+        return ()
+
+    submodule_directories_output = check_output(
+        [args.git_command, "config", "--file", str(dot_modules), "--get-regexp", "path"])
+    return tuple([Path(line.split(' ', 1)[1]) for line in submodule_directories_output.strip().splitlines()])
+
+
+def ensure_git_lfs(args: argparse.Namespace) -> None:
+    # Use `--skip-repo` to avoid creating git hooks.
+    # This is called from the `blender.git` checkout, so we don't need to install hooks there.
+    call((args.git_command, "lfs", "install", "--skip-repo"), exit_on_error=True)
+
+
+def initialize_precompiled_libraries(args: argparse.Namespace) -> str:
+    """
+    Configure submodule for precompiled libraries
+
+    This function detects the current host architecture and enables
+    corresponding submodule, and updates the submodule.
+
+    NOTE: When cross-compiling the architecture is coming from the command line
+    argument.
+    """
+
+    print_stage("Configuring Precompiled Libraries")
+
+    platform = get_effective_platform(args)
+    arch = get_effective_architecture(args)
+
+    print(f"Detected platform     : {platform}")
+    print(f"Detected architecture : {arch}")
+    print()
+
+    if sys.platform == "linux" and not args.use_linux_libraries:
+        print("Skipping Linux libraries configuration")
+        return ""
+
+    submodule_dir = f"lib/{platform}_{arch}"
+
+    submodule_directories = get_submodule_directories(args)
+
+    if Path(submodule_dir) not in submodule_directories:
+        return "Skipping libraries update: no configured submodule\n"
+
+    print(f"* Enabling precompiled libraries at {submodule_dir}")
+    make_utils.git_enable_submodule(args.git_command, Path(submodule_dir))
+
+    return ""
+
+
+def initialize_tests_data_files(args: argparse.Namespace) -> str:
+    """
+    Configure submodule with files used by regression tests
+    """
+
+    print_stage("Configuring Tests Data Files")
+
+    submodule_dir = "tests/data"
+
+    print(f"* Enabling tests data at {submodule_dir}")
+    make_utils.git_enable_submodule(args.git_command, Path(submodule_dir))
+
+    return ""
+
+
 def git_update_skip(args: argparse.Namespace, check_remote_exists: bool = True) -> str:
+    """Test if git repo can be updated."""
+
     if make_utils.command_missing(args.git_command):
         sys.stderr.write("git not found, can't update code\n")
         sys.exit(1)
@@ -297,23 +282,23 @@ def resolve_external_url(blender_url: str, repo_name: str) -> str:
     return urljoin(blender_url + "/", "../" + repo_name)
 
 
-def external_script_copy_old_submodule_over(args: argparse.Namespace, directory_name: str) -> None:
-    blender_git_root = Path(get_blender_git_root())
-    scripts_dir = blender_git_root / "scripts"
-    external_dir = scripts_dir / directory_name
+def external_script_copy_old_submodule_over(
+        args: argparse.Namespace,
+        directory: Path,
+        old_submodules_dir: Path,
+) -> None:
+    blender_git_root = get_blender_git_root()
+    external_dir = blender_git_root / directory
 
-    old_submodule_relative_dir = Path("release") / "scripts" / directory_name
-    print(f"Moving {old_submodule_relative_dir} to scripts/{directory_name} ...")
-
-    old_submodule_dir = blender_git_root / old_submodule_relative_dir
-    shutil.move(old_submodule_dir, external_dir)
+    print(f"Moving {old_submodules_dir} to {directory} ...")
+    shutil.move(blender_git_root / old_submodules_dir, external_dir)
 
     # Remove old ".git" which is a file with path to a submodule bare repo inside of main
     # repo .git/modules directory.
     (external_dir / ".git").unlink()
 
-    bare_repo_relative_dir = Path(".git") / "modules" / "release" / "scripts" / directory_name
-    print(f"Copying {bare_repo_relative_dir} to scripts/{directory_name}/.git ...")
+    bare_repo_relative_dir = Path(".git") / "modules" / old_submodules_dir
+    print(f"Copying {bare_repo_relative_dir} to {directory}/.git ...")
     bare_repo_dir = blender_git_root / bare_repo_relative_dir
     shutil.copytree(bare_repo_dir, external_dir / ".git")
 
@@ -321,78 +306,46 @@ def external_script_copy_old_submodule_over(args: argparse.Namespace, directory_
     call((args.git_command, "config", "--file", str(git_config), "--unset", "core.worktree"))
 
 
-def external_script_initialize_if_needed(args: argparse.Namespace,
-                                         actual_repo_name: str,
-                                         directory_name: str) -> None:
-    """Initialize checkout of an external repository scripts directory"""
+def floating_checkout_initialize_if_needed(
+        args: argparse.Namespace,
+        repo_name: str,
+        directory: Path,
+        old_submodules_dir: Optional[Path] = None,
+) -> None:
+    """Initialize checkout of an external repository"""
 
-    blender_git_root = Path(get_blender_git_root())
+    blender_git_root = get_blender_git_root()
     blender_dot_git = blender_git_root / ".git"
-    scripts_dir = blender_git_root / "scripts"
-    external_dir: Path = scripts_dir / directory_name
+    external_dir = blender_git_root / directory
 
     if external_dir.exists():
         return
 
-    print(f"Initializing scripts/{directory_name} ...")
+    print(f"Initializing {directory} ...")
 
-    old_submodule_dot_git = blender_git_root / "release" / "scripts" / directory_name / ".git"
-    if old_submodule_dot_git.exists() and blender_dot_git.is_dir():
-        external_script_copy_old_submodule_over(args, directory_name)
-        return
+    if old_submodules_dir is not None:
+        old_submodule_dot_git = blender_git_root / old_submodules_dir / ".git"
+        if old_submodule_dot_git.exists() and blender_dot_git.is_dir():
+            external_script_copy_old_submodule_over(args, directory, old_submodules_dir)
+            return
 
-    # Determine the primary remote of the main Blender repository and its URL.
-    # This remote's URL will be used as the base to resolve the external script's repository URL.
-    main_blender_repo_primary_remote_name = "upstream" if use_upstream_workflow(args) else "origin"
-    main_blender_repo_url = make_utils.git_get_remote_url(args.git_command, main_blender_repo_primary_remote_name)
-
-    # Special handling for 'addons_contrib' if using the default name, to always point to official GitHub.
-    if directory_name == "addons_contrib" and actual_repo_name == "blender-addons-contrib":
-        print(f"Forcing 'scripts/{directory_name}' to use official GitHub repository: blender/{actual_repo_name}")
-        external_repo_url_to_clone = f"https://github.com/blender/{actual_repo_name}"
-        # When using a forced official URL, typically name the remote 'upstream'.
-        remote_name_for_clone = "upstream"
-    else:
-        # Default URL resolution:
-        # URL for the external script's repository, derived from the main Blender repo's URL and the actual_repo_name.
-        external_repo_url_to_clone = resolve_external_url(main_blender_repo_url, actual_repo_name)
-        remote_name_for_clone = main_blender_repo_primary_remote_name
+    origin_name = "upstream" if use_upstream_workflow(args) else "origin"
+    blender_url = make_utils.git_get_remote_url(args.git_command, origin_name)
+    external_url = resolve_external_url(blender_url, repo_name)
 
     # When running `make update` from a freshly cloned fork check whether the fork of the submodule is
-    # available. If not, switch to the submodule relative to the main blender repository.
-    # This fallback is triggered if:
-    # 1. The main Blender repo's primary remote is 'origin' (i.e., likely a fork, and not using 'upstream' as primary).
-    # 2. The derived URL for the external script's repository (e.g., user_fork/actual_repo_name) is not found.
-    if main_blender_repo_primary_remote_name == "origin" and \
-       not (directory_name == "addons_contrib" and actual_repo_name == "blender-addons-contrib") and \
-       not make_utils.git_is_remote_repository(args.git_command, external_repo_url_to_clone):
-        standard_official_repo_name = ""
-        if directory_name == "addons":
-            standard_official_repo_name = "blender-addons"
-        elif directory_name == "addons_contrib":
-            standard_official_repo_name = "blender-addons-contrib"
-            # This case implies actual_repo_name was something other than "blender-addons-contrib"
-            # (e.g. a custom fork name that wasn't found).
+    # available, If not, switch to the submodule relative to the main blender repository.
+    if origin_name == "origin" and not make_utils.git_is_remote_repository(args.git_command, external_url):
+        external_url = resolve_external_url("https://projects.blender.org/blender/blender", repo_name)
 
-        if standard_official_repo_name:
-            print(f"Forked repository {external_repo_url_to_clone} (derived from your 'origin' remote and repo name '{actual_repo_name}') not found.")
-            print(f"Falling back to official Blender repository for {directory_name}: {standard_official_repo_name}.")
-            if directory_name == "addons_contrib" and standard_official_repo_name == "blender-addons-contrib":
-                external_repo_url_to_clone = "https://github.com/blender/blender-addons-contrib"
-            else:
-                official_blender_base_url = "https://projects.blender.org/blender/blender"
-                external_repo_url_to_clone = resolve_external_url(official_blender_base_url, standard_official_repo_name)
-            # When cloning the official repo as a fallback, name the remote 'upstream' in the sub-repo.
-            # This helps 'external_script_add_origin_if_needed' to correctly set up 'origin' for the user's fork later.
-            remote_name_for_clone = "upstream"
-        else:
-            sys.stderr.write(f"Warning: Could not determine standard repo name for {directory_name} during fallback. Will attempt to clone {external_repo_url_to_clone} as is.\n")
-    call((args.git_command, "clone", "--origin", remote_name_for_clone, external_repo_url_to_clone, str(external_dir)))
+    call((args.git_command, "clone", "--origin", origin_name, external_url, str(external_dir)))
 
 
-def external_script_add_origin_if_needed(args: argparse.Namespace,
-                                         actual_repo_name: str,
-                                         directory_name: str) -> None:
+def floating_checkout_add_origin_if_needed(
+        args: argparse.Namespace,
+        repo_name: str,
+        directory: Path,
+) -> None:
     """
     Add remote called 'origin' if there is a fork of the external repository available
 
@@ -404,12 +357,11 @@ def external_script_add_origin_if_needed(args: argparse.Namespace,
 
     cwd = os.getcwd()
 
-    blender_git_root = Path(get_blender_git_root())
-    scripts_dir = blender_git_root / "scripts"
-    external_dir = scripts_dir / directory_name
+    blender_git_root = get_blender_git_root()
+    external_dir = blender_git_root / directory
 
     origin_blender_url = make_utils.git_get_remote_url(args.git_command, "origin")
-    origin_external_url = resolve_external_url(origin_blender_url, actual_repo_name)
+    origin_external_url = resolve_external_url(origin_blender_url, repo_name)
 
     try:
         os.chdir(external_dir)
@@ -421,7 +373,7 @@ def external_script_add_origin_if_needed(args: argparse.Namespace,
         if not make_utils.git_is_remote_repository(args.git_command, origin_external_url):
             return
 
-        print(f"Adding origin remote to {directory_name} pointing to fork ...")
+        print(f"Adding origin remote to {directory} pointing to fork ...")
 
         # Non-obvious tricks to introduce the new remote called "origin" to the existing
         # submodule configuration.
@@ -450,22 +402,31 @@ def external_script_add_origin_if_needed(args: argparse.Namespace,
     return
 
 
-def external_scripts_update(args: argparse.Namespace,
-                            actual_repo_name: str,
-                            directory_name: str,
-                            branch: Optional[str]) -> str:
+def floating_checkout_update(
+        args: argparse.Namespace,
+        repo_name: str,
+        directory: Path,
+        branch: Optional[str],
+        old_submodules_dir: Optional[Path] = None,
+        only_update: bool = False,
+) -> str:
     """Update a single external checkout with the given name in the scripts folder"""
 
-    external_script_initialize_if_needed(args, actual_repo_name, directory_name)
-    external_script_add_origin_if_needed(args, actual_repo_name, directory_name)
+    blender_git_root = get_blender_git_root()
+    external_dir = blender_git_root / directory
 
-    print(f"Updating scripts/{directory_name} (from repository '{actual_repo_name}')...")
+    if only_update and not external_dir.exists():
+        return ""
+
+    floating_checkout_initialize_if_needed(args, repo_name, directory, old_submodules_dir)
+    floating_checkout_add_origin_if_needed(args, repo_name, directory)
+
+    blender_git_root = get_blender_git_root()
+    external_dir = blender_git_root / directory
+
+    print(f"* Updating {directory} ...")
 
     cwd = os.getcwd()
-
-    blender_git_root = Path(get_blender_git_root())
-    scripts_dir = blender_git_root / "scripts"
-    external_dir = scripts_dir / directory_name
 
     # Update externals to appropriate given branch, falling back to main if none is given and/or
     # found in a sub-repository.
@@ -479,7 +440,7 @@ def external_scripts_update(args: argparse.Namespace,
         os.chdir(external_dir)
         msg = git_update_skip(args, check_remote_exists=False)
         if msg:
-            skip_msg += directory_name + " skipped: " + msg + "\n"
+            skip_msg += str(directory) + " skipped: " + msg + "\n"
         else:
             # Find a matching branch that exists.
             for remote in ("origin", "upstream"):
@@ -525,22 +486,110 @@ def external_scripts_update(args: argparse.Namespace,
     return skip_msg
 
 
-def scripts_submodules_update(args: argparse.Namespace, branch: Optional[str]) -> str:
-    """Update working trees of addons and addons_contrib within the scripts/ directory"""
+def external_scripts_update(
+        args: argparse.Namespace,
+        repo_name: str,
+        directory_name: str,
+        branch: Optional[str],
+) -> str:
+    return floating_checkout_update(
+        args,
+        repo_name,
+        Path("scripts") / directory_name,
+        branch,
+        old_submodules_dir=Path("release") / "scripts" / directory_name,
+    )
+
+
+def floating_libraries_update(args: argparse.Namespace, branch: Optional[str]) -> str:
+    """Update libraries checkouts which are floating (not attached as Git submodules)"""
     msg = ""
 
-    # Use the repository names provided by arguments or their defaults.
-    addons_repo_name = args.addons_repo_name
-    addons_contrib_repo_name = args.addons_contrib_repo_name
-
-    msg += external_scripts_update(args, addons_repo_name, "addons", branch)
-    msg += external_scripts_update(args, addons_contrib_repo_name, "addons_contrib", branch)
+    msg += floating_checkout_update(
+        args,
+        "benchmarks",
+        Path("tests") / "benchmarks",
+        branch,
+        only_update=True,
+    )
 
     return msg
 
 
-def submodules_update(args: argparse.Namespace, branch: Optional[str]) -> str:
+def add_submodule_push_url(args: argparse.Namespace) -> None:
+    """
+    Add pushURL configuration for all locally activated submodules, pointing to SSH protocol.
+    """
+
+    blender_git_root = get_blender_git_root()
+    modules = blender_git_root / ".git" / "modules"
+
+    submodule_directories = get_submodule_directories(args)
+
+    for submodule_path in submodule_directories:
+        module_path = modules / submodule_path
+        config = module_path / "config"
+
+        if not config.exists():
+            # Ignore modules which are not initialized
+            continue
+
+        push_url = check_output((args.git_command, "config", "--file", str(config),
+                                "--get", "remote.origin.pushURL"), exit_on_error=False)
+        if push_url and push_url != "git@projects.blender.org:blender/lib-darwin_arm64.git":
+            # Ignore modules which have pushURL configured.
+            # Keep special exception, as some debug code sneaked into the production for a short
+            # while.
+            continue
+
+        url = make_utils.git_get_config(args.git_command, "remote.origin.url", str(config))
+        if not url.startswith("https:"):
+            # Ignore non-URL URLs.
+            continue
+
+        url_parts = urlsplit(url)
+        push_url = f"git@{url_parts.netloc}:{url_parts.path[1:]}"
+
+        print(f"Setting pushURL to {push_url} for {submodule_path}")
+        make_utils.git_set_config(args.git_command, "remote.origin.pushURL", push_url, str(config))
+
+
+def submodules_lib_update(args: argparse.Namespace, branch: Optional[str]) -> str:
+    print_stage("Updating Libraries")
+
+    msg = ""
+    msg += floating_libraries_update(args, branch)
+
+    submodule_directories = get_submodule_directories(args)
+    for submodule_path in submodule_directories:
+        if not make_utils.is_git_submodule_enabled(args.git_command, submodule_path):
+            print(f"* Skipping {submodule_path}")
+            continue
+
+        print(f"* Updating {submodule_path} ...")
+
+        if not make_utils.git_update_submodule(args.git_command, submodule_path):
+            msg += f"Error updating Git submodule {submodule_path}\n"
+
+    add_submodule_push_url(args)
+
+    return msg
+
+
+def scripts_submodules_update(args: argparse.Namespace, branch: Optional[str]) -> str:
+    """Update working trees of addons and addons_contrib within the scripts/ directory"""
+    msg = ""
+
+    msg += external_scripts_update(args, "blender-addons", "addons", branch)
+    msg += external_scripts_update(args, "blender-addons-contrib", "addons_contrib", branch)
+
+    return msg
+
+
+def submodules_code_update(args: argparse.Namespace, branch: Optional[str]) -> str:
     """Update submodules or other externally tracked source trees"""
+    print_stage("Updating Submodules")
+
     msg = ""
 
     msg += scripts_submodules_update(args, branch)
@@ -550,25 +599,8 @@ def submodules_update(args: argparse.Namespace, branch: Optional[str]) -> str:
 
 if __name__ == "__main__":
     args = parse_arguments()
-    # ---- ADD DEBUG PRINT ----
-    print("---- DEBUG make_update.py: Raw sys.argv ----")
-    print(sys.argv)
-    print("---- DEBUG make_update.py: Parsed arguments ----")
-    print(f"args.no_libraries: {args.no_libraries}")
-    print(f"args.no_blender: {args.no_blender}")
-    print(f"args.no_submodules: {args.no_submodules}")
-    print(f"args.use_tests: {args.use_tests}")
-    print(f"args.svn_command: {args.svn_command}")
-    print(f"args.svn_branch: {args.svn_branch}") # This is the crucial one
-    print(f"args.git_command: {args.git_command}")
-    print(f"args.use_linux_libraries: {args.use_linux_libraries}")
-    print(f"args.architecture: {args.architecture}")
-    print(f"args.windows_vc_version: {args.windows_vc_version}")
-    print(f"args.addons_repo_name: {args.addons_repo_name}")
-    print(f"args.addons_contrib_repo_name: {args.addons_contrib_repo_name}")
-    print("---- /DEBUG ----")
-    # ---- END DEBUG PRINT ----
     blender_skip_msg = ""
+    libraries_skip_msg = ""
     submodules_skip_msg = ""
 
     blender_version = make_utils. parse_blender_version()
@@ -576,26 +608,33 @@ if __name__ == "__main__":
         major = blender_version.version // 100
         minor = blender_version.version % 100
         branch = f"blender-v{major}.{minor}-release"
-        release_version: Optional[str] = f"{major}.{minor}"
     else:
         branch = 'main'
-        release_version = None
 
-    if not args.no_libraries:
-        svn_update(args, release_version)
+    # Submodules and precompiled libraries require Git LFS.
+    ensure_git_lfs(args)
+
     if not args.no_blender:
         blender_skip_msg = git_update_skip(args)
         if not blender_skip_msg:
             blender_skip_msg = blender_update(args)
         if blender_skip_msg:
             blender_skip_msg = "Blender repository skipped: " + blender_skip_msg + "\n"
+
+    if not args.no_libraries:
+        libraries_skip_msg += initialize_precompiled_libraries(args)
+        if args.use_tests:
+            libraries_skip_msg += initialize_tests_data_files(args)
+        libraries_skip_msg += submodules_lib_update(args, branch)
+
     if not args.no_submodules:
-        submodules_skip_msg = submodules_update(args, branch)
+        submodules_skip_msg += submodules_code_update(args, branch)
 
     # Report any skipped repositories at the end, so it's not as easy to miss.
-    skip_msg = blender_skip_msg + submodules_skip_msg
+    skip_msg = blender_skip_msg + libraries_skip_msg + submodules_skip_msg
     if skip_msg:
-        print_stage(skip_msg.strip())
+        print_stage("Update finished with the following messages")
+        print(skip_msg.strip())
 
     # For failed submodule update we throw an error, since not having correct
     # submodules can make Blender throw errors.

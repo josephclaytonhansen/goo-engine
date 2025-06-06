@@ -2371,69 +2371,7 @@ GHOST_TSuccess GHOST_SystemWin32::hasClipboardImage(void) const
     return GHOST_kSuccess;
   }
 
-  /* This could be a file path to an image file. */
-  GHOST_TSuccess result = GHOST_kFailure;
-  if (IsClipboardFormatAvailable(CF_HDROP)) {
-    if (OpenClipboard(nullptr)) {
-      if (HANDLE hGlobal = GetClipboardData(CF_HDROP)) {
-        if (HDROP hDrop = static_cast<HDROP>(GlobalLock(hGlobal))) {
-          UINT fileCount = DragQueryFile(hDrop, 0xffffffff, nullptr, 0);
-          if (fileCount == 1) {
-            WCHAR lpszFile[MAX_PATH] = {0};
-            DragQueryFileW(hDrop, 0, lpszFile, MAX_PATH);
-            char *filepath = alloc_utf_8_from_16(lpszFile, 0);
-            ImBuf *ibuf = IMB_testiffname(filepath, IB_rect | IB_multilayer);
-            free(filepath);
-            if (ibuf) {
-              IMB_freeImBuf(ibuf);
-              result = GHOST_kSuccess;
-            }
-          }
-          GlobalUnlock(hGlobal);
-        }
-      }
-      CloseClipboard();
-    }
-  }
-  return result;
-}
-
-static uint *getClipboardImageFilepath(int *r_width, int *r_height)
-{
-  char *filepath = nullptr;
-
-  if (OpenClipboard(nullptr)) {
-    if (HANDLE hGlobal = GetClipboardData(CF_HDROP)) {
-      if (HDROP hDrop = static_cast<HDROP>(GlobalLock(hGlobal))) {
-        UINT fileCount = DragQueryFile(hDrop, 0xffffffff, nullptr, 0);
-        if (fileCount == 1) {
-          WCHAR lpszFile[MAX_PATH] = {0};
-          DragQueryFileW(hDrop, 0, lpszFile, MAX_PATH);
-          filepath = alloc_utf_8_from_16(lpszFile, 0);
-        }
-        GlobalUnlock(hGlobal);
-      }
-    }
-    CloseClipboard();
-  }
-
-  if (filepath) {
-    ImBuf *ibuf = IMB_loadiffname(filepath, IB_rect | IB_multilayer, nullptr);
-    free(filepath);
-    if (ibuf) {
-      *r_width = ibuf->x;
-      *r_height = ibuf->y;
-      const uint64_t byte_count = static_cast<uint64_t>(ibuf->x) * ibuf->y * 4;
-      uint *rgba = static_cast<uint *>(malloc(byte_count));
-      if (rgba) {
-        memcpy(rgba, ibuf->byte_buffer.data, byte_count);
-      }
-      IMB_freeImBuf(ibuf);
-      return rgba;
-    }
-  }
-
-  return nullptr;
+  return GHOST_kFailure;
 }
 
 static uint *getClipboardImageDibV5(int *r_width, int *r_height)
@@ -2450,9 +2388,6 @@ static uint *getClipboardImageDibV5(int *r_width, int *r_height)
 
   int offset = bitmapV5Header->bV5Size + bitmapV5Header->bV5ClrUsed * sizeof(RGBQUAD);
 
-  if (bitmapV5Header->bV5Compression == BI_BITFIELDS) {
-    offset += 12;
-  }
   BYTE *buffer = (BYTE *)bitmapV5Header + offset;
   int bitcount = bitmapV5Header->bV5BitCount;
   int width = bitmapV5Header->bV5Width;
@@ -2557,10 +2492,6 @@ static uint *getClipboardImageImBuf(int *r_width, int *r_height, UINT format)
 
 uint *GHOST_SystemWin32::getClipboardImage(int *r_width, int *r_height) const
 {
-  if (IsClipboardFormatAvailable(CF_HDROP)) {
-    return getClipboardImageFilepath(r_width, r_height);
-  }
-
   if (!OpenClipboard(nullptr)) {
     return nullptr;
   }
@@ -2605,8 +2536,7 @@ static bool putClipboardImageDibV5(uint *rgba, int width, int height)
 
   DWORD size_pixels = width * height * 4;
 
-  /* Pixel data is 12 bytes after the header. */
-  HGLOBAL hMem = GlobalAlloc(GHND, sizeof(BITMAPV5HEADER) + 12 + size_pixels);
+  HGLOBAL hMem = GlobalAlloc(GHND, sizeof(BITMAPV5HEADER) + size_pixels);
   if (!hMem) {
     return false;
   }
@@ -2632,7 +2562,7 @@ static bool putClipboardImageDibV5(uint *rgba, int width, int height)
   hdr->bV5Intent = LCS_GM_IMAGES;
   hdr->bV5ClrUsed = 0;
 
-  memcpy((char *)hdr + sizeof(BITMAPV5HEADER) + 12, rgba, size_pixels);
+  memcpy((char *)hdr + sizeof(BITMAPV5HEADER), rgba, size_pixels);
 
   GlobalUnlock(hMem);
 
