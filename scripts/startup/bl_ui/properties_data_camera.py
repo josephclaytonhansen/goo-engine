@@ -96,6 +96,8 @@ class DATA_PT_lens(CameraButtonsPanel, Panel):
             elif cam.lens_unit == 'FOV':
                 col.prop(cam, "angle")
             col.prop(cam, "lens_unit")
+            col.prop(cam, "resolution_x", text = "Resolution X")
+            col.prop(cam, "resolution_y", text = "Resolution Y")
 
         elif cam.type == 'ORTHO':
             col.prop(cam, "ortho_scale")
@@ -254,9 +256,15 @@ class DATA_PT_camera_dof(CameraButtonsPanel, Panel):
         col.prop(dof, "focus_object", text="Focus on Object")
         if dof.focus_object and dof.focus_object.type == 'ARMATURE':
             col.prop_search(dof, "focus_subtarget", dof.focus_object.data, "bones", text="Focus on Bone")
+
         sub = col.column()
         sub.active = (dof.focus_object is None)
-        sub.prop(dof, "focus_distance", text="Focus Distance")
+        row = sub.row(align=True)
+        row.prop(dof, "focus_distance", text="Focus Distance")
+        row.operator(
+            "ui.eyedropper_depth",
+            icon='EYEDROPPER',
+            text="").prop_data_path = "scene.camera.data.dof.focus_distance"
 
 
 class DATA_PT_camera_dof_aperture(CameraButtonsPanel, Panel):
@@ -380,7 +388,7 @@ class DATA_PT_camera_background_image(CameraButtonsPanel, Panel):
                     col = box.column()
                     if bg.image is not None:
                         col.prop(bg.image, "use_view_as_render")
-                    col.prop(bg, "alpha")
+                    col.prop(bg, "alpha", slider=True)
                     col.row().prop(bg, "display_depth", expand=True)
 
                     col.row().prop(bg, "frame_method", expand=True)
@@ -588,3 +596,4 @@ if __name__ == "__main__":  # only for live edit.
     from bpy.utils import register_class
     for cls in classes:
         register_class(cls)
+
