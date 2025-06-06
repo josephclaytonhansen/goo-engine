@@ -91,6 +91,9 @@ typedef struct Camera {
   char panorama_type;
   char _pad[2];
 
+  int resolution_x;
+  int resolution_y;
+
   /* Fish-eye properties. */
   float fisheye_fov;
   float fisheye_lens;
